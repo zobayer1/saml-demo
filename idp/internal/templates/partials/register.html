@@ -3,7 +3,7 @@
     <div class="auth-card">
         <div class="auth-header">
             <h2>Create Your Account</h2>
-            <p>Register for SAML IDP Demo</p>
+            <p>Register on the SAML IDP Demo</p>
         </div>
 
         {{if .Error}}
@@ -16,7 +16,8 @@
         <div class="alert alert-success">
             {{.Success | safeHTML}}
         </div>
-        {{else}}
+        {{end}}
+
         <form method="POST" action="/register" class="auth-form">
             <div class="form-group">
                 <label for="username">Full Name</label>
@@ -36,7 +37,7 @@
 
             <div class="form-group">
                 <label for="email">
-                    Email Address <span id="email-validation"></span>
+                    Email Address <span id="email-validation">{{.Email | renderEmailValidation}}</span>
                 </label>
                 <input
                     type="email"
@@ -96,7 +97,6 @@
                 <button type="submit" class="btn btn-primary btn-full">Create Account</button>
             </div>
         </form>
-        {{end}}
 
         <div class="auth-footer">
             <p>Already have an account? <a href="/login" class="auth-link">Sign in here</a></p>

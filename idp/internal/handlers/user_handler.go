@@ -26,15 +26,15 @@ func NewUserHandler(userService *services.UserService) *UserHandler {
 func (h *UserHandler) HandleReg(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		h.GetRegForm(w, r)
+		h.getRegForm(w, r)
 	case http.MethodPost:
-		h.SubmitReg(w, r)
+		h.submitReg(w, r)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func (h *UserHandler) GetRegForm(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) getRegForm(w http.ResponseWriter, _ *http.Request) {
 	data := models.PageData{
 		Title: "Register - MyIDP",
 		Page:  "register",
@@ -42,7 +42,7 @@ func (h *UserHandler) GetRegForm(w http.ResponseWriter, r *http.Request) {
 	h.renderRegisterPage(w, data, "", "")
 }
 
-func (h *UserHandler) SubmitReg(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) submitReg(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		log.WithError(err).Error("Failed to parse registration form")
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -122,30 +122,51 @@ func (h *UserHandler) renderRegisterPage(w http.ResponseWriter, data models.Page
 
 			var buf strings.Builder
 
-			// First check email format
 			if err := helpers.ValidateEmail(email); err != nil {
-				data := struct{ Error string }{Error: "Invalid email format"}
-				emailTmpl.ExecuteTemplate(&buf, "email-validation-error", data)
+				if tmplErr := emailTmpl.ExecuteTemplate(
+					&buf,
+					"email-validation-error",
+					struct{ Error string }{Error: "Invalid email format"},
+				); tmplErr != nil {
+					log.Errorf("Failed to render template: %v", tmplErr)
+					return "Invalid email format"
+				}
 				return template.HTML(buf.String())
 			}
 
-			// Then check email availability
-			ctx := context.Background()
-			exists, err := h.userService.CheckEmailExists(ctx, email)
+			exists, err := h.userService.CheckEmailExists(context.Background(), email)
 			if err != nil {
-				data := struct{ Error string }{Error: "Unable to verify email availability"}
-				emailTmpl.ExecuteTemplate(&buf, "email-validation-error", data)
+				if tmplErr := emailTmpl.ExecuteTemplate(
+					&buf,
+					"email-validation-error",
+					struct{ Error string }{Error: "Unable to verify email availability"},
+				); tmplErr != nil {
+					log.Errorf("Failed to render template: %v", tmplErr)
+					return "Unable to verify email availability"
+				}
 				return template.HTML(buf.String())
 			}
 
 			if exists {
-				data := struct{ Error string }{Error: "Email is already registered"}
-				emailTmpl.ExecuteTemplate(&buf, "email-validation-error", data)
+				if tmplErr := emailTmpl.ExecuteTemplate(
+					&buf,
+					"email-validation-error",
+					struct{ Error string }{Error: "Email is already registered"},
+				); tmplErr != nil {
+					log.Errorf("Failed to render template: %v", tmplErr)
+					return "Email is already registered"
+				}
 				return template.HTML(buf.String())
 			}
 
-			data := struct{ Success string }{Success: "Email is available"}
-			emailTmpl.ExecuteTemplate(&buf, "email-validation-success", data)
+			if tmplErr := emailTmpl.ExecuteTemplate(
+				&buf,
+				"email-validation-success",
+				struct{ Success string }{Success: "Email is available"},
+			); tmplErr != nil {
+				log.Errorf("Failed to render template: %v", tmplErr)
+				return "Email is available"
+			}
 			return template.HTML(buf.String())
 		},
 	}).ParseFiles(
@@ -184,7 +205,6 @@ func (h *UserHandler) ValidateEmail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 
-	// First check email format
 	if err := helpers.ValidateEmail(email); err != nil {
 		data := struct{ Error string }{Error: "Invalid email format"}
 		tmplErr := tmpl.ExecuteTemplate(w, "email-validation-error", data)
@@ -194,7 +214,6 @@ func (h *UserHandler) ValidateEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Then check email availability
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
