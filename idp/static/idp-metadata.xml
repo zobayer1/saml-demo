@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+                     xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                     xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:schemaLocation="urn:oasis:names:tc:SAML:2.0:metadata
+                                         https://docs.oasis-open.org/security/saml/v2.0/saml-schema-metadata-2.0.xsd
+                                         http://www.w3.org/2000/09/xmldsig#
+                                         https://www.w3.org/TR/xmldsig-core/xmldsig-core-schema.xsd"
+                     entityID="https://idp.localhost:8000">
+    <md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol"
+                         WantAuthnRequestsSigned="false">
+
+        <!-- Signing Certificate -->
+        <md:KeyDescriptor use="signing">
+            <ds:KeyInfo>
+                <ds:X509Data>
+                    <ds:X509Certificate>MIIDXzCCAkegAwIBAgIUNVE1Joq17RGpltgyeSsyskF4YAUwDQYJKoZIhvcNAQELBQAwHTEbMBkGA1UEAwwSTG9jYWwgU0FNTCBEZW1vIENBMB4XDTI1MDgyNDA3NDIxOVoXDTI2MDgyNDA3NDIxOVowGDEWMBQGA1UEAwwNaWRwLmxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMcudBbK14cdAyLbUE2BRxbEXaLfyYtw2+0kci8v0V0elMQkP0DHm7P9rdgRIlocriF3Uazh3Eh/Zrh+desYqtStmBHRiCBBGs/lUWt3ax03vUFcH3IUKdjotGJPIXFzoPDwUJJnTbl/zxzKsN+uRkyRkhjAGOaIqOkvi49NqFSbej6QKy/pDoFB3JKGBp5ozbFt1iUEdhUEZbMLVxp8ddsADX72LCw9CsVXYfjDfObKncB8G5H+3jcs0KEnVY0KXyCPD3kVcaCunk+YdTYe03FkoKOkW4XQW2E/Ag9j3cSsiTv0/QMhx7NKNuPwFRnk5WrctH0SyeF14Sl8sWZGktkCAwEAAaOBmzCBmDALBgNVHQ8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwKQYDVR0RBCIwIIINaWRwLmxvY2FsaG9zdIIJbG9jYWxob3N0hwR/AAABMAkGA1UdEwQCMAAwHQYDVR0OBBYEFOZ2XmzgYcgztQaVl4DehZ9IlirhMB8GA1UdIwQYMBaAFN1sJQYO99fDvfDtBduMqViwj6rqMA0GCSqGSIb3DQEBCwUAA4IBAQAVCCEZhyrMZ3A4x5zqZ5BLHTN/vvCw5hb5vCt4PbF+hrOLHXwIOa2OzMHsW4/eWo8UCVJc5oYJ2niO7I7UF8ryQUJ03X3B3FIvO4R3XrAVYm/GgFSo0xPZcGcEwzvMwrQMBENOAk+qNuSzCdOOtiLcooh7TY59kLB5ttVm4/s/wS3wuJwwJ0ZBEi5EV3g0vSWgX+B47SyCbTxL0CFDIvwt2sENZ3HZKeXd6ONq1oS89fHXgAga7SsGhSxqE2gmQb83Sc8ccgj4/GaVg67e/bPJywXRy9KYcoF63x+RhJmd2h+WVSSEOUyQZ3L6eDL+NWQBoRj8Z1V1KzNfvsPXIyfP</ds:X509Certificate>
+                </ds:X509Data>
+            </ds:KeyInfo>
+        </md:KeyDescriptor>
+
+        <!-- Encryption Certificate (same as signing in this case) -->
+        <md:KeyDescriptor use="encryption">
+            <ds:KeyInfo>
+                <ds:X509Data>
+                    <ds:X509Certificate>MIIDXzCCAkegAwIBAgIUNVE1Joq17RGpltgyeSsyskF4YAUwDQYJKoZIhvcNAQELBQAwHTEbMBkGA1UEAwwSTG9jYWwgU0FNTCBEZW1vIENBMB4XDTI1MDgyNDA3NDIxOVoXDTI2MDgyNDA3NDIxOVowGDEWMBQGA1UEAwwNaWRwLmxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMcudBbK14cdAyLbUE2BRxbEXaLfyYtw2+0kci8v0V0elMQkP0DHm7P9rdgRIlocriF3Uazh3Eh/Zrh+desYqtStmBHRiCBBGs/lUWt3ax03vUFcH3IUKdjotGJPIXFzoPDwUJJnTbl/zxzKsN+uRkyRkhjAGOaIqOkvi49NqFSbej6QKy/pDoFB3JKGBp5ozbFt1iUEdhUEZbMLVxp8ddsADX72LCw9CsVXYfjDfObKncB8G5H+3jcs0KEnVY0KXyCPD3kVcaCunk+YdTYe03FkoKOkW4XQW2E/Ag9j3cSsiTv0/QMhx7NKNuPwFRnk5WrctH0SyeF14Sl8sWZGktkCAwEAAaOBmzCBmDALBgNVHQ8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwKQYDVR0RBCIwIIINaWRwLmxvY2FsaG9zdIIJbG9jYWxob3N0hwR/AAABMAkGA1UdEwQCMAAwHQYDVR0OBBYEFOZ2XmzgYcgztQaVl4DehZ9IlirhMB8GA1UdIwQYMBaAFN1sJQYO99fDvfDtBduMqViwj6rqMA0GCSqGSIb3DQEBCwUAA4IBAQAVCCEZhyrMZ3A4x5zqZ5BLHTN/vvCw5hb5vCt4PbF+hrOLHXwIOa2OzMHsW4/eWo8UCVJc5oYJ2niO7I7UF8ryQUJ03X3B3FIvO4R3XrAVYm/GgFSo0xPZcGcEwzvMwrQMBENOAk+qNuSzCdOOtiLcooh7TY59kLB5ttVm4/s/wS3wuJwwJ0ZBEi5EV3g0vSWgX+B47SyCbTxL0CFDIvwt2sENZ3HZKeXd6ONq1oS89fHXgAga7SsGhSxqE2gmQb83Sc8ccgj4/GaVg67e/bPJywXRy9KYcoF63x+RhJmd2h+WVSSEOUyQZ3L6eDL+NWQBoRj8Z1V1KzNfvsPXIyfP</ds:X509Certificate>
+                </ds:X509Data>
+            </ds:KeyInfo>
+        </md:KeyDescriptor>
+
+        <!-- Supported NameID Formats -->
+        <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
+        <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>
+        <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</md:NameIDFormat>
+
+        <!-- Single Sign-On Service Endpoints -->
+        <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                                Location="https://idp.localhost:8000/sso"/>
+        <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                                Location="https://idp.localhost:8000/sso"/>
+
+        <!-- Supported Attributes -->
+        <saml:Attribute Name="email"
+                        NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"/>
+        <saml:Attribute Name="username"
+                        NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"/>
+        <saml:Attribute Name="role"
+                        NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"/>
+        <saml:Attribute Name="status"
+                        NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"/>
+    </md:IDPSSODescriptor>
+</md:EntityDescriptor>

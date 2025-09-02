@@ -1,0 +1,23 @@
+{{define "password-strength-error"}}
+<span class="form-feedback error">
+    <span class="feedback-icon">✗</span> {{.Error}}
+</span>
+{{end}}
+
+{{define "password-strength-success"}}
+<span class="form-feedback success">
+    <span class="feedback-icon">✓</span> {{.Strength}}
+</span>
+{{end}}
+
+{{define "password-match-error"}}
+<span class="form-feedback error">
+    <span class="feedback-icon">✗</span> {{.Error}}
+</span>
+{{end}}
+
+{{define "password-match-success"}}
+<span class="form-feedback success">
+    <span class="feedback-icon">✓</span> {{.Success}}
+</span>
+{{end}}

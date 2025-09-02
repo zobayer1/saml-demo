@@ -1,0 +1,106 @@
+{{define "content"}}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>Create Your Account</h2>
+            <p>Register for SAML IDP Demo</p>
+        </div>
+
+        {{if .Error}}
+        <div class="alert alert-error">
+            <strong>Registration Failed:</strong> {{.Error}}
+        </div>
+        {{end}}
+
+        {{if .Success}}
+        <div class="alert alert-success">
+            {{.Success | safeHTML}}
+        </div>
+        {{else}}
+        <form method="POST" action="/register" class="auth-form">
+            <div class="form-group">
+                <label for="username">Full Name</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    placeholder="Enter your full name"
+                    value="{{.Username}}"
+                    autofocus
+                    required
+                    minlength="4"
+                    maxlength="64"
+                    class="form-input"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="email">
+                    Email Address <span id="email-validation"></span>
+                </label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="Enter your email address"
+                    value="{{.Email}}"
+                    required
+                    maxlength="128"
+                    class="form-input"
+                    hx-post="/api/validate-email"
+                    hx-target="#email-validation"
+                    hx-trigger="input changed delay:500ms"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">
+                    Password <span id="password-validation"></span>
+                </label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    required
+                    minlength="8"
+                    maxlength="32"
+                    class="form-input"
+                    hx-post="/api/validate-password"
+                    hx-target="#password-validation"
+                    hx-trigger="input changed delay:500ms, keyup delay:500ms"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">
+                    Confirm Password <span id="password-match-validation"></span>
+                </label>
+                <input
+                    type="password"
+                    id="confirm_password"
+                    name="confirm_password"
+                    placeholder="Confirm your password"
+                    required
+                    minlength="8"
+                    maxlength="32"
+                    class="form-input"
+                    hx-post="/api/validate-password-match"
+                    hx-target="#password-match-validation"
+                    hx-trigger="input changed delay:300ms, keyup delay:300ms"
+                    hx-include="[name='password']"
+                >
+            </div>
+
+            <div class="form-button">
+                <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+            </div>
+        </form>
+        {{end}}
+
+        <div class="auth-footer">
+            <p>Already have an account? <a href="/login" class="auth-link">Sign in here</a></p>
+        </div>
+    </div>
+</div>
+{{end}}
