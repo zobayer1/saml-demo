@@ -144,6 +144,7 @@ func (h *UserHandler) renderRegisterPage(w http.ResponseWriter, data models.RegP
 	tmpl := template.Must(template.ParseFiles(
 		filepath.Join("internal", "templates", "base.html"),
 		filepath.Join("internal", "templates", "partials", "register.html"),
+		filepath.Join("internal", "templates", "partials", "email_validation.html"),
 	))
 
 	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
@@ -171,7 +172,7 @@ func (h *UserHandler) ValidateEmail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 
-	data := models.EmailValidationResponse{}
+	data := models.EmailValidationResponse{ShowEmailValidation: true}
 
 	if err := helpers.ValidateEmail(email); err != nil {
 		data.EmailValidationError = "Invalid email format"

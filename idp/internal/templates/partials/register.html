@@ -42,13 +42,9 @@
                     <span id="email-validation">
                         {{if .ShowEmailValidation}}
                             {{if .EmailValidationError}}
-                                <span class="form-feedback error">
-                                    <span class="feedback-icon">✗</span> {{.EmailValidationError}}
-                                </span>
+                                {{template "email-validation-error" .}}
                             {{else if .EmailValidationSuccess}}
-                                <span class="form-feedback success">
-                                    <span class="feedback-icon">✓</span> {{.EmailValidationSuccess}}
-                                </span>
+                                {{template "email-validation-success" .}}
                             {{end}}
                         {{end}}
                     </span>
