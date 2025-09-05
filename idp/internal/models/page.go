@@ -14,9 +14,9 @@ type RegPageData struct {
 	PageData
 	Username               string
 	Email                  string
-	EmailValidationError   string // For email format/availability errors
-	EmailValidationSuccess string // For email availability success message
-	ShowEmailValidation    bool   // Whether to show email validation feedback
+	EmailValidationError   string
+	EmailValidationSuccess string
+	ShowEmailValidation    bool
 }
 
 type LoginPageData struct {

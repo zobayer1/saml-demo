@@ -35,11 +35,16 @@ func (h *UserHandler) HandleReg(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) getRegForm(w http.ResponseWriter, _ *http.Request) {
-	data := models.PageData{
-		Title: "Register - MyIDP",
-		Page:  "register",
+	data := models.RegPageData{
+		PageData: models.PageData{
+			Title: "Register - MyIDP",
+			Page:  "register",
+		},
+		Username:            "",
+		Email:               "",
+		ShowEmailValidation: false,
 	}
-	h.renderRegisterPage(w, data, "", "")
+	h.renderRegisterPage(w, data)
 }
 
 func (h *UserHandler) submitReg(w http.ResponseWriter, r *http.Request) {
@@ -54,133 +59,90 @@ func (h *UserHandler) submitReg(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
 
-	data := models.PageData{
-		Title: "Register - MyIDP",
-		Page:  "register",
+	data := models.RegPageData{
+		PageData: models.PageData{
+			Title: "Register - MyIDP",
+			Page:  "register",
+		},
+		Username:            username,
+		Email:               email,
+		ShowEmailValidation: true,
 	}
 
 	if username == "" || email == "" || password == "" || confirmPassword == "" {
 		data.Error = "Missing required fields"
-		h.renderRegisterPage(w, data, username, email)
+		h.renderRegisterPage(w, data)
 		return
 	}
 
 	if err := helpers.ValidateEmail(email); err != nil {
 		data.Error = "Email validation failed: " + err.Error()
-		h.renderRegisterPage(w, data, username, email)
-		return
-	}
-
-	_, err := helpers.ValidatePassword(password)
-	if err != nil {
-		data.Error = "Password validation failed: " + err.Error()
-		h.renderRegisterPage(w, data, username, email)
-		return
-	}
-
-	if password != confirmPassword {
-		data.Error = "Passwords do not match"
-		h.renderRegisterPage(w, data, username, email)
+		data.EmailValidationError = "Invalid email format"
+		h.renderRegisterPage(w, data)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
+	exists, emailErr := h.userService.CheckEmailExists(ctx, email)
+	if emailErr != nil {
+		log.WithError(emailErr).Error("Failed to check email availability")
+		data.Error = "Internal server error. Please try again."
+		h.renderRegisterPage(w, data)
+		return
+	}
+	if exists {
+		data.Error = "An account with this email already exists"
+		data.EmailValidationError = "Email is already registered"
+		h.renderRegisterPage(w, data)
+		return
+	} else {
+		data.EmailValidationSuccess = "Email is available"
+	}
+
+	_, err := helpers.ValidatePassword(password)
+	if err != nil {
+		data.Error = "Password validation failed: " + err.Error()
+		h.renderRegisterPage(w, data)
+		return
+	}
+
+	if password != confirmPassword {
+		data.Error = "Passwords do not match"
+		h.renderRegisterPage(w, data)
+		return
+	}
+
 	user, err := h.userService.CreateUser(ctx, username, email, password)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
 			data.Error = "An account with this email already exists"
+			data.EmailValidationError = "Email is already registered"
 		} else {
 			log.WithError(err).Error("Failed to create user")
-			data.Error = "Registration failed. Please try again."
+			data.Error = "Registration failed. Please try again"
 		}
-		h.renderRegisterPage(w, data, username, email)
+		h.renderRegisterPage(w, data)
 		return
 	}
 
-	data.Success = "Registration successful! Your account has been created. " +
-		"You can now <a href=\"/login\" class=\"auth-link\">sign in</a> to access your account."
+	data.Username = ""
+	data.Email = ""
+	data.ShowEmailValidation = false
+	data.Success = "Registration successful! You can now log in"
 	log.WithField("user_id", user.ID).WithField("email", email).Info("User registered successfully")
 
-	h.renderRegisterPage(w, data, "", "")
+	h.renderRegisterPage(w, data)
 }
 
-func (h *UserHandler) renderRegisterPage(w http.ResponseWriter, data models.PageData, username, email string) {
-	tmpl := template.Must(template.New("").Funcs(template.FuncMap{
-		"safeHTML": func(s string) template.HTML {
-			return template.HTML(s)
-		},
-		"renderEmailValidation": func(email string) template.HTML {
-			if email == "" {
-				return ""
-			}
-
-			emailTmpl := template.Must(template.ParseFiles(
-				filepath.Join("internal", "templates", "partials", "email_validation.html"),
-			))
-
-			var buf strings.Builder
-
-			if err := helpers.ValidateEmail(email); err != nil {
-				if tmplErr := emailTmpl.ExecuteTemplate(
-					&buf,
-					"email-validation-error",
-					struct{ Error string }{Error: "Invalid email format"},
-				); tmplErr != nil {
-					log.Errorf("Failed to render template: %v", tmplErr)
-					return "Invalid email format"
-				}
-				return template.HTML(buf.String())
-			}
-
-			exists, err := h.userService.CheckEmailExists(context.Background(), email)
-			if err != nil {
-				if tmplErr := emailTmpl.ExecuteTemplate(
-					&buf,
-					"email-validation-error",
-					struct{ Error string }{Error: "Unable to verify email availability"},
-				); tmplErr != nil {
-					log.Errorf("Failed to render template: %v", tmplErr)
-					return "Unable to verify email availability"
-				}
-				return template.HTML(buf.String())
-			}
-
-			if exists {
-				if tmplErr := emailTmpl.ExecuteTemplate(
-					&buf,
-					"email-validation-error",
-					struct{ Error string }{Error: "Email is already registered"},
-				); tmplErr != nil {
-					log.Errorf("Failed to render template: %v", tmplErr)
-					return "Email is already registered"
-				}
-				return template.HTML(buf.String())
-			}
-
-			if tmplErr := emailTmpl.ExecuteTemplate(
-				&buf,
-				"email-validation-success",
-				struct{ Success string }{Success: "Email is available"},
-			); tmplErr != nil {
-				log.Errorf("Failed to render template: %v", tmplErr)
-				return "Email is available"
-			}
-			return template.HTML(buf.String())
-		},
-	}).ParseFiles(
+func (h *UserHandler) renderRegisterPage(w http.ResponseWriter, data models.RegPageData) {
+	tmpl := template.Must(template.ParseFiles(
 		filepath.Join("internal", "templates", "base.html"),
 		filepath.Join("internal", "templates", "partials", "register.html"),
 	))
 
-	combinedData := models.RegPageData{
-		PageData: data,
-		Username: username,
-		Email:    email,
-	}
-
-	if err := tmpl.ExecuteTemplate(w, "base.html", combinedData); err != nil {
+	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
 		log.WithError(err).Error("Failed to render register template")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}

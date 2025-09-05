@@ -14,7 +14,8 @@
 
         {{if .Success}}
         <div class="alert alert-success">
-            {{.Success | safeHTML}}
+            Registration successful! Your account has been created.
+            You can now <a href="/login" class="auth-link">sign in</a> to access your account.
         </div>
         {{end}}
 
@@ -37,7 +38,20 @@
 
             <div class="form-group">
                 <label for="email">
-                    Email Address <span id="email-validation">{{.Email | renderEmailValidation}}</span>
+                    Email Address
+                    <span id="email-validation">
+                        {{if .ShowEmailValidation}}
+                            {{if .EmailValidationError}}
+                                <span class="form-feedback error">
+                                    <span class="feedback-icon">✗</span> {{.EmailValidationError}}
+                                </span>
+                            {{else if .EmailValidationSuccess}}
+                                <span class="form-feedback success">
+                                    <span class="feedback-icon">✓</span> {{.EmailValidationSuccess}}
+                                </span>
+                            {{end}}
+                        {{end}}
+                    </span>
                 </label>
                 <input
                     type="email"
