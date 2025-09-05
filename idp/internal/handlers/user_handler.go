@@ -40,9 +40,11 @@ func (h *UserHandler) getRegForm(w http.ResponseWriter, _ *http.Request) {
 			Title: "Register - MyIDP",
 			Page:  "register",
 		},
-		Username:            "",
-		Email:               "",
-		ShowEmailValidation: false,
+		Username: "",
+		Email:    "",
+		EmailValidationResponse: models.EmailValidationResponse{
+			ShowEmailValidation: false,
+		},
 	}
 	h.renderRegisterPage(w, data)
 }
@@ -64,9 +66,11 @@ func (h *UserHandler) submitReg(w http.ResponseWriter, r *http.Request) {
 			Title: "Register - MyIDP",
 			Page:  "register",
 		},
-		Username:            username,
-		Email:               email,
-		ShowEmailValidation: true,
+		Username: username,
+		Email:    email,
+		EmailValidationResponse: models.EmailValidationResponse{
+			ShowEmailValidation: true,
+		},
 	}
 
 	if username == "" || email == "" || password == "" || confirmPassword == "" {
@@ -167,8 +171,10 @@ func (h *UserHandler) ValidateEmail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 
+	data := models.EmailValidationResponse{}
+
 	if err := helpers.ValidateEmail(email); err != nil {
-		data := struct{ Error string }{Error: "Invalid email format"}
+		data.EmailValidationError = "Invalid email format"
 		tmplErr := tmpl.ExecuteTemplate(w, "email-validation-error", data)
 		if tmplErr != nil {
 			http.Error(w, tmplErr.Error(), http.StatusInternalServerError)
@@ -187,7 +193,7 @@ func (h *UserHandler) ValidateEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if exists {
-		data := struct{ Error string }{Error: "Email is already registered"}
+		data.EmailValidationError = "Email is already registered"
 		tmplErr := tmpl.ExecuteTemplate(w, "email-validation-error", data)
 		if tmplErr != nil {
 			http.Error(w, tmplErr.Error(), http.StatusInternalServerError)
@@ -195,7 +201,7 @@ func (h *UserHandler) ValidateEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := struct{ Success string }{Success: "Email is available"}
+	data.EmailValidationSuccess = "Email is available"
 	tmplErr := tmpl.ExecuteTemplate(w, "email-validation-success", data)
 	if tmplErr != nil {
 		http.Error(w, tmplErr.Error(), http.StatusInternalServerError)

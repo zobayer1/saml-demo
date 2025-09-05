@@ -1,5 +1,11 @@
 package models
 
+type EmailValidationResponse struct {
+	EmailValidationError   string
+	EmailValidationSuccess string
+	ShowEmailValidation    bool
+}
+
 type PageData struct {
 	Page        string
 	Title       string
@@ -12,11 +18,9 @@ type PageData struct {
 
 type RegPageData struct {
 	PageData
-	Username               string
-	Email                  string
-	EmailValidationError   string
-	EmailValidationSuccess string
-	ShowEmailValidation    bool
+	Username string
+	Email    string
+	EmailValidationResponse
 }
 
 type LoginPageData struct {
