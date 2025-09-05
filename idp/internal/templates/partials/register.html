@@ -79,7 +79,7 @@
                     class="form-input"
                     hx-post="/api/validate-password"
                     hx-target="#password-validation"
-                    hx-trigger="input changed delay:500ms, keyup delay:500ms"
+                    hx-trigger="input changed delay:400ms"
                 >
             </div>
 
@@ -98,7 +98,7 @@
                     class="form-input"
                     hx-post="/api/validate-password-match"
                     hx-target="#password-match-validation"
-                    hx-trigger="input changed delay:300ms, keyup delay:300ms"
+                    hx-trigger="input changed delay:400ms, keyup from:#password delay:400ms"
                     hx-include="[name='password']"
                 >
             </div>
