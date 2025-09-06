@@ -129,18 +129,18 @@ func (h *UserHandler) submitReg(w http.ResponseWriter, r *http.Request) {
 	}
 	if exists {
 		data.Error = "An account with this email already exists"
-		data.EmailValidationError = "Email is already registered"
+		data.EmailValidationError = "Already registered"
 		h.renderRegisterPage(w, data)
 		return
 	} else {
-		data.EmailValidationSuccess = "Email is available"
+		data.EmailValidationSuccess = "Available"
 	}
 
 	user, err := h.userService.CreateUser(ctx, username, email, password)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
 			data.Error = "An account with this email already exists"
-			data.EmailValidationError = "Email is already registered"
+			data.EmailValidationError = "Already registered"
 		} else {
 			log.WithError(err).Error("Failed to create user")
 			data.Error = "Registration failed. Please try again"
@@ -248,7 +248,7 @@ func (h *UserHandler) ValidateEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if exists {
-		data.EmailValidationError = "Email is already registered"
+		data.EmailValidationError = "Already registered"
 		tmplErr := tmpl.ExecuteTemplate(w, "email-validation-error", data)
 		if tmplErr != nil {
 			log.WithError(tmplErr).Error("Failed to render email validation template")
@@ -257,7 +257,7 @@ func (h *UserHandler) ValidateEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data.EmailValidationSuccess = "Email is available"
+	data.EmailValidationSuccess = "Available"
 	tmplErr := tmpl.ExecuteTemplate(w, "email-validation-success", data)
 	if tmplErr != nil {
 		log.WithError(tmplErr).Error("Failed to render email validation template")
@@ -295,9 +295,7 @@ func (h *UserHandler) ValidatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	strengthText, strengthClass := helpers.GetPasswordStrengthLevel(passwordScore)
-	data.PasswordStrengthSuccess = strengthText
-	data.PasswordStrengthClass = "strength-" + strengthClass
+	data.PasswordStrengthSuccess, data.PasswordStrengthClass = helpers.GetPasswordStrengthLevel(passwordScore)
 	tmplErr := tmpl.ExecuteTemplate(w, "password-strength-success", data)
 	if tmplErr != nil {
 		log.WithError(tmplErr).Error("Failed to render password validation template")
@@ -332,7 +330,6 @@ func (h *UserHandler) ValidatePasswordMatch(w http.ResponseWriter, r *http.Reque
 		data.PasswordMatchError = "Passwords do not match"
 		tmplErr = tmpl.ExecuteTemplate(w, "password-match-error", data)
 	} else {
-		data.PasswordMatchSuccess = "Passwords match"
 		tmplErr = tmpl.ExecuteTemplate(w, "password-match-success", data)
 	}
 	if tmplErr != nil {

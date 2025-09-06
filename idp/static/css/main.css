@@ -183,10 +183,28 @@ body {
     color: #16a34a;
 }
 
-.form-feedback.info {
-    background-color: #f0f9ff;
-    border: 1px solid #bae6fd;
-    color: #0369a1;
+.form-feedback[data-strength-level="vw"] {
+    color: #dc2626; /* Very Weak - Red */
+}
+
+.form-feedback[data-strength-level="w"] {
+    color: #ea580c; /* Weak - Orange */
+}
+
+.form-feedback[data-strength-level="f"] {
+    color: #eab308; /* Fair - Yellow */
+}
+
+.form-feedback[data-strength-level="m"] {
+    color: #22c55e; /* Moderate - Green */
+}
+
+.form-feedback[data-strength-level="s"] {
+    color: #3b82f6; /* Strong - Blue */
+}
+
+.form-feedback[data-strength-level="vs"] {
+    color: #8b5cf6; /* Very Strong - Violet */
 }
 
 .form-feedback ul {
@@ -203,7 +221,6 @@ body {
     margin-right: 0.5rem;
 }
 
-/* FIXED SELECTORS - target the nested element with data attribute */
 .form-group:has([id$="-validation"] [data-validation-state="error"]) .form-input {
     border-color: #dc2626 !important;
     background-color: #fef2f2;
@@ -214,7 +231,42 @@ body {
     background-color: #f0fdf4;
 }
 
-/* Reset HTML5 validation when HTMX validation is active */
+/* Very Weak */
+.form-group:has([data-validation-state="strength"][data-strength-level="vw"]) .form-input {
+    border-color: #dc2626 !important;
+    background-color: #fef2f2;
+}
+
+/* Weak */
+.form-group:has([data-validation-state="strength"][data-strength-level="w"]) .form-input {
+    border-color: #ea580c !important;
+    background-color: #fff7ed;
+}
+
+/* Fair */
+.form-group:has([data-validation-state="strength"][data-strength-level="f"]) .form-input {
+    border-color: #eab308 !important;
+    background-color: #fefce8;
+}
+
+/* Moderate */
+.form-group:has([data-validation-state="strength"][data-strength-level="m"]) .form-input {
+    border-color: #22c55e !important;
+    background-color: #f0fdf4;
+}
+
+/* Strong */
+.form-group:has([data-validation-state="strength"][data-strength-level="s"]) .form-input {
+    border-color: #3b82f6 !important;
+    background-color: #eff6ff;
+}
+
+/* Very Strong */
+.form-group:has([data-validation-state="strength"][data-strength-level="vs"]) .form-input {
+    border-color: #8b5cf6 !important;
+    background-color: #f3f4f6;
+}
+
 .form-group:has([id$="-validation"] [data-validation-state]) .form-input:valid,
 .form-group:has([id$="-validation"] [data-validation-state]) .form-input:invalid {
     border-color: inherit;

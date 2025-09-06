@@ -5,7 +5,7 @@
 {{end}}
 
 {{define "password-strength-success"}}
-<span class="form-feedback success" data-validation-state="success">
+<span class="form-feedback success" data-validation-state="strength" data-strength-level="{{.PasswordStrengthClass}}">
     <span class="feedback-icon">✓</span> {{.PasswordStrengthSuccess}}
 </span>
 {{end}}
@@ -18,6 +18,6 @@
 
 {{define "password-match-success"}}
 <span class="form-feedback success" data-validation-state="success">
-    <span class="feedback-icon">✓</span> {{.PasswordMatchSuccess}}
+    <span class="feedback-icon">✓</span>
 </span>
 {{end}}
