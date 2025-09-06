@@ -156,14 +156,6 @@ body {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-.form-input:invalid {
-    border-color: #e53e3e;
-}
-
-.form-input:valid {
-    border-color: #38a169;
-}
-
 .form-help {
     font-size: 0.8rem;
     color: #718096;
@@ -209,6 +201,24 @@ body {
 .feedback-icon {
     font-weight: bold;
     margin-right: 0.5rem;
+}
+
+/* FIXED SELECTORS - target the nested element with data attribute */
+.form-group:has([id$="-validation"] [data-validation-state="error"]) .form-input {
+    border-color: #dc2626 !important;
+    background-color: #fef2f2;
+}
+
+.form-group:has([id$="-validation"] [data-validation-state="success"]) .form-input {
+    border-color: #16a34a !important;
+    background-color: #f0fdf4;
+}
+
+/* Reset HTML5 validation when HTMX validation is active */
+.form-group:has([id$="-validation"] [data-validation-state]) .form-input:valid,
+.form-group:has([id$="-validation"] [data-validation-state]) .form-input:invalid {
+    border-color: inherit;
+    background-color: inherit;
 }
 
 /* Button Styles */

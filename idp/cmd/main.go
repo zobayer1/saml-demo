@@ -53,8 +53,9 @@ func main() {
 	mux.HandleFunc("/sso", ssoHandler.HandleSso)
 	mux.HandleFunc("/slo", ssoHandler.HandleSlo)
 
-	mux.HandleFunc("/api/validate-password", userHandler.ValidatePassword)
+	mux.HandleFunc("/api/validate-username", userHandler.ValidateUsername)
 	mux.HandleFunc("/api/validate-email", userHandler.ValidateEmail)
+	mux.HandleFunc("/api/validate-password", userHandler.ValidatePassword)
 	mux.HandleFunc("/api/validate-password-match", userHandler.ValidatePasswordMatch)
 
 	mux.HandleFunc("/metadata", func(w http.ResponseWriter, r *http.Request) {

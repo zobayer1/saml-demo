@@ -1,11 +1,11 @@
 {{define "email-validation-error"}}
-<span class="form-feedback error">
+<span class="form-feedback error" data-validation-state="error">
     <span class="feedback-icon">✗</span> {{.EmailValidationError}}
 </span>
 {{end}}
 
 {{define "email-validation-success"}}
-<span class="form-feedback success">
+<span class="form-feedback success" data-validation-state="success">
     <span class="feedback-icon">✓</span> {{.EmailValidationSuccess}}
 </span>
 {{end}}

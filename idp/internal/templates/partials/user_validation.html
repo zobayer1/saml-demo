@@ -1,0 +1,11 @@
+{{define "user-validation-error"}}
+<span class="form-feedback error" data-validation-state="error">
+    <span class="feedback-icon">✗</span> {{.UserValidationError}}
+</span>
+{{end}}
+
+{{define "user-validation-success"}}
+<span class="form-feedback success" data-validation-state="success">
+    <span class="feedback-icon">✓</span> {{.UserValidationSuccess}}
+</span>
+{{end}}

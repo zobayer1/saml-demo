@@ -1,23 +1,23 @@
 {{define "password-strength-error"}}
-<span class="form-feedback error">
-    <span class="feedback-icon">✗</span> {{.Error}}
+<span class="form-feedback error" data-validation-state="error">
+    <span class="feedback-icon">✗</span> {{.PasswordStrengthError}}
 </span>
 {{end}}
 
 {{define "password-strength-success"}}
-<span class="form-feedback success">
-    <span class="feedback-icon">✓</span> {{.Strength}}
+<span class="form-feedback success" data-validation-state="success">
+    <span class="feedback-icon">✓</span> {{.PasswordStrengthSuccess}}
 </span>
 {{end}}
 
 {{define "password-match-error"}}
-<span class="form-feedback error">
-    <span class="feedback-icon">✗</span> {{.Error}}
+<span class="form-feedback error" data-validation-state="error">
+    <span class="feedback-icon">✗</span> {{.PasswordMatchError}}
 </span>
 {{end}}
 
 {{define "password-match-success"}}
-<span class="form-feedback success">
-    <span class="feedback-icon">✓</span> {{.Success}}
+<span class="form-feedback success" data-validation-state="success">
+    <span class="feedback-icon">✓</span> {{.PasswordMatchSuccess}}
 </span>
 {{end}}

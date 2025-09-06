@@ -19,20 +19,20 @@ func ValidateEmail(email string) error {
 	return nil
 }
 
-func GetPasswordStrengthLevel(entropy float64) string {
+func GetPasswordStrengthLevel(entropy float64) (string, string) {
 	switch {
 	case entropy >= 80:
-		return "Very Strong"
+		return "Very Strong", "vs"
 	case entropy >= 70:
-		return "Strong"
+		return "Strong", "s"
 	case entropy >= 60:
-		return "Moderate"
+		return "Moderate", "m"
 	case entropy >= 50:
-		return "Fair"
+		return "Fair", "f"
 	case entropy >= 40:
-		return "Weak"
+		return "Weak", "w"
 	default:
-		return "Very Weak"
+		return "Very Weak", "vw"
 	}
 }
 
@@ -78,7 +78,26 @@ func ValidatePassword(password string) (float64, error) {
 		}
 	}
 	if len(charset) < 4 {
-		return 0.0, errors.New("password uses too few unique characters")
+		return 0.0, errors.New("uses too few unique characters")
 	}
 	return math.Floor(float64(len(password)) * math.Log2(charpool)), nil
+}
+
+func ValidateUsername(username string) error {
+	if len(username) < 4 {
+		return errors.New("must be at least 4 characters")
+	}
+	if len(username) > 64 {
+		return errors.New("must not exceed 64 characters")
+	}
+	for _, char := range username {
+		if !unicode.IsLetter(char) &&
+			char != ' ' &&
+			char != '-' &&
+			char != '\'' &&
+			char != '.' {
+			return errors.New("can only contain letters, spaces, hyphens, apostrophes, and periods")
+		}
+	}
+	return nil
 }

@@ -21,7 +21,18 @@
 
         <form method="POST" action="/register" class="auth-form">
             <div class="form-group">
-                <label for="username">Full Name</label>
+                <label for="username">
+                    Full Name
+                    <span id="user-validation">
+                        {{if .ShowUserValidation}}
+                            {{if .UserValidationError}}
+                                {{template "user-validation-error" .}}
+                            {{else if .UserValidationSuccess}}
+                                {{template "user-validation-success" .}}
+                            {{end}}
+                        {{end}}
+                    </span>
+                </label>
                 <input
                     type="text"
                     id="username"
@@ -33,6 +44,10 @@
                     minlength="4"
                     maxlength="64"
                     class="form-input"
+                    autocomplete="full-name"
+                    hx-post="/api/validate-username"
+                    hx-target="#user-validation"
+                    hx-trigger="input changed delay:500ms"
                 >
             </div>
 
@@ -58,6 +73,7 @@
                     required
                     maxlength="128"
                     class="form-input"
+                    autocomplete="off"
                     hx-post="/api/validate-email"
                     hx-target="#email-validation"
                     hx-trigger="input changed delay:500ms"
@@ -77,6 +93,7 @@
                     minlength="8"
                     maxlength="32"
                     class="form-input"
+                    autocomplete="off"
                     hx-post="/api/validate-password"
                     hx-target="#password-validation"
                     hx-trigger="input changed delay:400ms"
@@ -96,9 +113,10 @@
                     minlength="8"
                     maxlength="32"
                     class="form-input"
+                    autocomplete="off"
                     hx-post="/api/validate-password-match"
                     hx-target="#password-match-validation"
-                    hx-trigger="input changed delay:400ms, keyup from:#password delay:400ms"
+                    hx-trigger="input changed delay:400ms, keyup from:#password delay:400ms, paste from:#password delay:100ms"
                     hx-include="[name='password']"
                 >
             </div>
