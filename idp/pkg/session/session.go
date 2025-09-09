@@ -18,7 +18,7 @@ func InitSession(secret string) {
 		Path:     "/",
 		Domain:   "idp.localhost",
 		MaxAge:   3600,
-		HttpOnly: false,
+		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	}

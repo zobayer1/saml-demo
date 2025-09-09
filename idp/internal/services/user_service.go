@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -30,27 +31,44 @@ func (s *UserService) CheckEmailExists(ctx context.Context, email string) (bool,
 	return exists, nil
 }
 
-func (s *UserService) ValidateLogin(ctx context.Context, email, password string) (*models.User, error) {
+func (s *UserService) Authenticate(ctx context.Context, email, password string) (*models.User, error) {
 	var user models.User
 	var passwordHash string
+	var rolesJSON string
 
-	err := s.DB.QueryRowContext(ctx,
-		"SELECT id, username, email, password_hash, created_at, status FROM users WHERE email = ?", email).
-		Scan(&user.ID, &user.Username, &user.Email, &passwordHash, &user.CreatedAt, &user.Status)
-	if err != nil {
+	if err := s.DB.QueryRowContext(ctx,
+		"SELECT id, username, email, password_hash, user_roles, created_at, status FROM users WHERE email = ?", email).
+		Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&passwordHash,
+			&rolesJSON,
+			&user.CreatedAt,
+			&user.Status,
+		); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			log.Debugf("No user found with email: %s", email)
 			return nil, nil
 		}
-		log.Errorf("Failed to query user by email: %v", err)
+		log.WithError(err).Error("Failed to query user by email: %s", email)
 		return nil, err
+	}
+
+	if rolesJSON != "" {
+		if err := json.Unmarshal([]byte(rolesJSON), &user.UserRoles); err != nil {
+			log.WithError(err).Errorf("Failed to parse user roles for user ID %d", user.ID)
+			return nil, err
+		}
+	} else {
+		user.UserRoles = make(map[string]string)
 	}
 
 	if bcryptErr := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)); bcryptErr != nil {
 		if errors.Is(bcryptErr, bcrypt.ErrMismatchedHashAndPassword) {
 			return nil, nil
 		}
-		log.Errorf("Failed to compare password hash: %v", bcryptErr)
+		log.WithError(bcryptErr).Error("Failed to compare password hashes", bcryptErr)
 		return nil, bcryptErr
 	}
 
@@ -77,9 +95,16 @@ func (s *UserService) CreateUser(ctx context.Context, name, email, password stri
 
 	createdAt := time.Now()
 	status := "active"
+	userRoles := map[string]string{"idp": "user"}
+	rolesJSON, rjErr := json.Marshal(userRoles)
+	if rjErr != nil {
+		log.Errorf("Failed to marshal user roles: %v", rjErr)
+		return models.User{}, rjErr
+	}
+
 	result, resErr := tx.Exec(
-		"INSERT INTO users (username, email, password_hash, created_at, status) VALUES (?, ?, ?, ?, ?)",
-		name, email, hashedPassword, createdAt, status,
+		"INSERT INTO users (username, email, password_hash, user_roles, created_at, status) VALUES (?, ?, ?, ?, ?, ?)",
+		name, email, hashedPassword, rolesJSON, createdAt, status,
 	)
 	if resErr != nil {
 		log.Errorf("Failed to insert user: %v", resErr)

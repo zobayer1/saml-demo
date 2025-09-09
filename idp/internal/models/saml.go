@@ -38,6 +38,14 @@ type SAMLRequestContext struct {
 	RequestTimestamp            time.Time // When you received the request
 }
 
+type SPAuthContext struct {
+	SPEntityID       string            // authnRequest.Issuer.Value (SP identifier)
+	RequiredRoles    []string          // Roles required by this SP
+	UserRoles        []string          // User's actual roles
+	AttributeMapping map[string]string // SP-specific attribute mapping
+	IsAuthorized     bool              // Whether user can access this SP
+}
+
 // Serialize converts SAMLRequestContext to JSON string for session storage
 func (s *SAMLRequestContext) Serialize() (string, error) {
 	data, err := json.Marshal(s)
@@ -55,14 +63,6 @@ func DeserializeSAMLRequestContext(data string) (*SAMLRequestContext, error) {
 		return nil, err
 	}
 	return &ctx, nil
-}
-
-type SPAuthContext struct {
-	SPEntityID       string            // authnRequest.Issuer.Value (SP identifier)
-	RequiredRoles    []string          // Roles required by this SP
-	UserRoles        []string          // User's actual roles
-	AttributeMapping map[string]string // SP-specific attribute mapping
-	IsAuthorized     bool              // Whether user can access this SP
 }
 
 // Serialize converts SPAuthContext to JSON string for session storage

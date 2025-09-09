@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -10,18 +11,19 @@ type User struct {
 	Username  string
 	CreatedAt time.Time
 	Status    string
+	UserRoles map[string]string
 }
 
 type UserSession struct {
-	UserID          string    // Unique user identifier
-	Username        string    // User login name
-	Email           string    // User email
-	UserRoles       []string  // Roles assigned to user
-	IsAuthenticated bool      // Authentication status
-	AuthMethod      string    // "password", "mfa", etc.
-	AuthTimestamp   time.Time // When user authenticated
-	SessionID       string    // Unique session identifier
-	Status          string    // "active", "inactive", etc.
+	UserID          string            // Unique user identifier
+	Username        string            // User login name
+	Email           string            // User email
+	UserRoles       map[string]string // Roles assigned to user
+	IsAuthenticated bool              // Authentication status
+	AuthMethod      string            // "password", "mfa", etc.
+	AuthTimestamp   time.Time         // When user authenticated
+	SessionID       string            // Unique session identifier
+	Status          string            // "active", "inactive", etc.
 }
 
 type SessionMetadata struct {
@@ -31,4 +33,33 @@ type SessionMetadata struct {
 	IPAddress string    // Client IP
 	UserAgent string    // Client user agent
 	CSRFToken string    // CSRF protection
+}
+
+type UserValidationResponse struct {
+	UserValidationError   string
+	UserValidationSuccess string
+	ShowUserValidation    bool
+}
+
+type EmailValidationResponse struct {
+	EmailValidationError   string
+	EmailValidationSuccess string
+	ShowEmailValidation    bool
+}
+
+type PasswordValidationResponse struct {
+	PasswordStrengthClass   string
+	PasswordStrengthError   string
+	PasswordStrengthSuccess string
+	PasswordMatchError      string
+	PasswordMatchSuccess    string
+	ShowPasswordValidation  bool
+}
+
+func (u *UserSession) Serialize() (string, error) {
+	data, err := json.Marshal(u)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }

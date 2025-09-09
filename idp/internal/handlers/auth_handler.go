@@ -1,16 +1,20 @@
 package handlers
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"idp/internal/helpers"
 	"idp/internal/models"
 	"idp/internal/services"
+	"idp/pkg/session"
 )
 
 type AuthHandler struct {
@@ -21,100 +25,207 @@ func NewAuthHandler(userService *services.UserService) *AuthHandler {
 	return &AuthHandler{userService: userService}
 }
 
-func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		h.GetLoginForm(w, r)
-	case http.MethodPost:
-		h.ValidateLogin(w, r)
-	default:
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func (h *AuthHandler) GetLoginForm(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) renderLoginPage(w http.ResponseWriter, data models.LoginPageData) {
 	tmpl := template.Must(template.ParseFiles(
 		filepath.Join("internal", "templates", "base.html"),
 		filepath.Join("internal", "templates", "partials", "login.html"),
 	))
-	data := models.PageData{
-		Title: "Login - MyIDP",
-		Page:  "login",
-		SSOState: models.SAMLState{
-			SAMLFlow:   false,
-			SPName:     "",
-			SPEntityID: "",
-		},
-		CurrentUser: models.UserSession{
-			IsAuthenticated: false,
-		},
-	}
 	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-func (h *AuthHandler) ValidateLogin(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) getLoginForm(w http.ResponseWriter, r *http.Request) {
+	data := models.LoginPageData{
+		PageData: models.PageData{
+			Title: "Login - MyIDP",
+			Page:  "login",
+		},
+		SAMLState: models.SAMLState{
+			SAMLFlow:   false,
+			SPName:     "",
+			SPEntityID: "",
+		},
+		UserSession: models.UserSession{
+			IsAuthenticated: false,
+		},
+	}
+
+	isSAMLParam := r.URL.Query().Get("saml") == "true"
+	samlSession, err := session.Store.Get(r, "saml-context")
+	if err != nil {
+		log.WithError(err).Error("Session store corrupted")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if contextData, exists := samlSession.Values["saml-context"]; exists {
+		if contextStr, ok := contextData.(string); ok && len(contextStr) > 0 {
+			samlContext, serdeErr := models.DeserializeSAMLRequestContext(contextStr)
+			if serdeErr != nil {
+				log.WithError(serdeErr).Error("Failed to deserialize SAML context")
+				http.Error(w, serdeErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			data.SAMLState = models.SAMLState{
+				SAMLFlow:   true,
+				SPName:     extractSPName(samlContext.Issuer),
+				SPEntityID: samlContext.Issuer,
+			}
+			log.Debugf("SAML flow detected from session - SP: %s", samlContext.Issuer)
+		} else {
+			log.Error("SAML context not found in session")
+			http.Error(w, "Session context invalid", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if isSAMLParam && !data.SAMLState.SAMLFlow {
+		data.Error = "SAML session expired. Please try again from your application."
+	}
+
+	h.renderLoginPage(w, data)
+}
+
+func (h *AuthHandler) validateLogin(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		h.renderLoginWithError(w, r, "Invalid form data", "")
+		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
 	email := strings.TrimSpace(r.FormValue("email"))
 	password := r.FormValue("password")
+	rememberMe := r.FormValue("remember_me") == "on"
 
-	if email == "" {
-		h.renderLoginWithError(w, r, "Email address is required", email)
-		return
+	data := models.LoginPageData{
+		PageData: models.PageData{
+			Title: "Login - MyIDP",
+			Page:  "login",
+		},
+		Email:    email,
+		Remember: rememberMe,
 	}
 
-	if password == "" {
-		h.renderLoginWithError(w, r, "Password is required", email)
+	if email == "" || password == "" {
+		data.Error = "Missing required fields"
+		h.renderLoginPage(w, data)
 		return
 	}
 
 	if err := helpers.ValidateEmail(email); err != nil {
-		h.renderLoginWithError(w, r, "Please enter a valid email address", email)
+		data.Error = "Please enter a valid email address"
+		h.renderLoginPage(w, data)
 		return
 	}
 
-	user, authErr := h.userService.ValidateLogin(r.Context(), email, password)
+	user, authErr := h.userService.Authenticate(r.Context(), email, password)
 	if authErr != nil {
-		h.renderLoginWithError(w, r, authErr.Error(), email)
+		log.WithError(authErr).Errorf("Failed to validate login")
+		data.Error = "Internal server error, please try again"
+		h.renderLoginPage(w, data)
+		return
 	}
-	if user != nil {
-		log.Infof("User %s authenticated successfully", user.Email)
-	} else {
-		h.renderLoginWithError(w, r, "Invalid email or password", email)
+	if user == nil {
+		data.Error = "Invalid email address or password"
+		h.renderLoginPage(w, data)
+		return
 	}
-	// 2. Database lookup and password verification
-	// 3. Session management
-	// 4. SAML flow handling
-	// 5. Redirect handling
+	userSession := models.UserSession{
+		UserID:          fmt.Sprintf("%d", user.ID),
+		Username:        user.Username,
+		Email:           user.Email,
+		UserRoles:       user.UserRoles,
+		IsAuthenticated: true,
+		AuthMethod:      "password",
+		AuthTimestamp:   time.Now(),
+		SessionID:       uuid.New().String(),
+		Status:          user.Status,
+	}
+	serializedUserSession, err := userSession.Serialize()
+	if err != nil {
+		log.WithError(err).Errorf("Failed to serialize user session")
+		http.Error(w, "Session serialization error", http.StatusInternalServerError)
+		return
+	}
+	sessionStore, err := session.Store.Get(r, "user-session")
+	if err != nil {
+		log.WithError(err).Error("Failed to get session")
+	}
+	sessionStore.Values["user-session"] = serializedUserSession
+	sessionOptions := *session.Store.Options
+	if rememberMe {
+		sessionOptions.MaxAge = 7 * 24 * 60 * 60
+	}
+	sessionStore.Options = &sessionOptions
+	if err := sessionStore.Save(r, w); err != nil {
+		log.WithError(err).Error("Failed to save session")
+		http.Error(w, "Session error", http.StatusInternalServerError)
+		return
+	}
 
-	http.Error(w, "Login validation completed - remaining steps not implemented", http.StatusNotImplemented)
+	samlSession, err := session.Store.Get(r, "saml-context")
+	if err != nil {
+		log.WithError(err).Error("Session store corruption detected during login validation")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var samlContext *models.SAMLRequestContext
+
+	if contextData, exists := samlSession.Values["saml-context"]; exists {
+		if contextStr, ok := contextData.(string); ok {
+			samlContext, err = models.DeserializeSAMLRequestContext(contextStr)
+			if err != nil {
+				log.WithError(err).Error("Failed to deserialize SAML context - proceeding with direct login")
+			} else {
+				log.Debugf("SAML context found - SP: %s, RequestID: %s", samlContext.Issuer, samlContext.RequestID)
+			}
+		} else {
+			log.Warn("SAML context found but not in expected string format")
+		}
+	} else {
+		log.Debug("No SAML context found in session - direct login flow")
+	}
+
+	if samlContext != nil {
+		log.Infof("User %s authenticated successfully for SAML flow - SP: %s", user.Email, samlContext.Issuer)
+		// TODO: Validate SP authorization
+		// TODO: Generate SAML Response
+		http.Error(w, fmt.Sprintf("SAML flow detected for SP: %s", samlContext.Issuer), http.StatusNotImplemented)
+		return
+	}
+
+	// 5. Direct login flow - Redirect to dashboard
+	log.Infof("User %s authenticated successfully - direct login flow", user.Email)
+	// TODO: Redirect to dashboard
+	http.Error(w, "Direct login successful - dashboard redirect not implemented", http.StatusNotImplemented)
 }
 
-func (h *AuthHandler) renderLoginWithError(w http.ResponseWriter, r *http.Request, errorMsg, email string) {
-	tmpl := template.Must(template.ParseFiles(
-		filepath.Join("internal", "templates", "base.html"),
-		filepath.Join("internal", "templates", "partials", "login.html"),
-	))
-	data := models.PageData{
-		Title: "Login - MyIDP",
-		Page:  "login",
-		Error: errorMsg,
-		CurrentUser: models.UserSession{
-			IsAuthenticated: false,
-			Email:           email,
-		},
-		SSOState: models.SAMLState{
-			SAMLFlow:   false,
-			SPName:     "",
-			SPEntityID: "",
-		},
+func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.getLoginForm(w, r)
+	case http.MethodPost:
+		h.validateLogin(w, r)
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
-	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+}
+
+// Helper function to extract a friendly SP name from entity ID
+func extractSPName(entityID string) string {
+	// For demo purposes, extract from URL or use a simple mapping
+	if strings.Contains(entityID, "sp1") {
+		return "Service Provider 1"
+	} else if strings.Contains(entityID, "sp2") {
+		return "Service Provider 2"
 	}
+	// Fallback: try to extract domain from URL
+	if strings.HasPrefix(entityID, "http") {
+		parts := strings.Split(entityID, "/")
+		if len(parts) > 2 {
+			return parts[2] // domain part
+		}
+	}
+	return "External Service"
 }

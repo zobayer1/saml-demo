@@ -111,7 +111,7 @@ func (h *UserHandler) submitReg(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := helpers.ValidateEmail(email); err != nil {
-		data.Error = "Email validation failed: " + err.Error()
+		data.Error = "Invalid email format"
 		data.EmailValidationError = "Invalid email format"
 		h.renderRegisterPage(w, data)
 		return
@@ -123,7 +123,7 @@ func (h *UserHandler) submitReg(w http.ResponseWriter, r *http.Request) {
 	exists, emailErr := h.userService.CheckEmailExists(ctx, email)
 	if emailErr != nil {
 		log.WithError(emailErr).Error("Failed to check email availability")
-		data.Error = "Internal server error. Please try again."
+		data.Error = "Internal server error, please try again"
 		h.renderRegisterPage(w, data)
 		return
 	}
@@ -143,7 +143,7 @@ func (h *UserHandler) submitReg(w http.ResponseWriter, r *http.Request) {
 			data.EmailValidationError = "Already registered"
 		} else {
 			log.WithError(err).Error("Failed to create user")
-			data.Error = "Registration failed. Please try again"
+			data.Error = "Registration failed, please try again"
 		}
 		h.renderRegisterPage(w, data)
 		return
@@ -153,7 +153,7 @@ func (h *UserHandler) submitReg(w http.ResponseWriter, r *http.Request) {
 	data.Email = ""
 	data.ShowUserValidation = false
 	data.ShowEmailValidation = false
-	data.Success = "Registration successful! You can now log in"
+	data.Success = "Registration successful!"
 	log.WithField("user_id", user.ID).WithField("email", email).Info("User registered successfully")
 
 	h.renderRegisterPage(w, data)

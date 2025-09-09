@@ -5,6 +5,7 @@ go 1.24
 require (
 	github.com/beevik/etree v1.5.0 // indirect
 	github.com/crewjam/saml v0.5.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/gorilla/sessions v1.4.0 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect

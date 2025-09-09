@@ -6,6 +6,22 @@
             <p>Sign in to SAML IDP Demo</p>
         </div>
 
+        {{if .Error}}
+        <div class="alert alert-error">
+            {{if .SAMLFlow}}
+            <strong>SAML Session Error:</strong> {{.Error}}
+            {{else}}
+            <strong>Login Failed:</strong> {{.Error}}
+            {{end}}
+        </div>
+        {{end}}
+
+        {{if .Success}}
+        <div class="alert alert-success">
+            <strong>Success!</strong> {{.Success}}
+        </div>
+        {{end}}
+
         <form class="auth-form" method="POST" action="/login">
             <div class="form-group">
                 <label for="email" class="form-label">Email Address</label>
@@ -14,10 +30,13 @@
                     id="email"
                     name="email"
                     class="form-input"
-                    required
                     placeholder="Enter your email address"
-                    value="{{.CurrentUser.Email}}"
                     autofocus
+                    required
+                    minlength="5"
+                    maxlength="128"
+                    value="{{.Email}}"
+                    autocomplete="email"
                 >
             </div>
 
@@ -28,11 +47,13 @@
                     id="password"
                     name="password"
                     class="form-input"
-                    required
                     placeholder="Enter your password"
+                    required
+                    minlength="8"
+                    maxlength="32"
+                    autocomplete="off"
                 >
             </div>
-
             <div class="form-group">
                 <div class="form-checkbox">
                     <input type="checkbox" id="remember" name="remember" class="form-checkbox-input">
@@ -46,15 +67,14 @@
             </div>
         </form>
 
-        <!-- SAML Flow Info -->
-        {{if .SSOState.SAMLFlow}}
+        {{if .SAMLFlow}}
         <div class="saml-info">
             <div class="saml-info-header">
                 <h4>SAML Authentication</h4>
             </div>
             <div class="saml-info-body">
-                <p><strong>Service Provider:</strong> {{.SSOState.SPName}}</p>
-                <p><strong>Requested Access:</strong> {{.SSOState.SPEntityID}}</p>
+                <p><strong>Service Provider:</strong> {{.SPName}}</p>
+                <p><strong>Requested Access:</strong> {{.SPEntityID}}</p>
             </div>
         </div>
         {{end}}
@@ -64,17 +84,4 @@
         </div>
     </div>
 </div>
-
-<!-- Success/Error Messages -->
-{{if .Success}}
-<div class="alert alert-success">
-    <strong>Success!</strong> {{.Success}}
-</div>
-{{end}}
-
-{{if .Error}}
-<div class="alert alert-error">
-    <strong>Error!</strong> {{.Error}}
-</div>
-{{end}}
 {{end}}
