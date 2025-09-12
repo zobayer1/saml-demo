@@ -1,0 +1,18 @@
+{{define "content"}}
+<div class="auth-card login-card">
+  <div class="auth-header">
+    <h2>{{.Title}}</h2>
+    <p>{{.SubTitle}}</p>
+  </div>
+  <div class="saml-info">
+    <h3 class="idp-heading">Available Identity Providers</h3>
+    <p class="idp-intro">Select an IdP below to continue authentication.</p>
+    <div class="idp-list">
+      <a class="btn btn-primary" href="/login/start?next={{.Next}}">Login with SAML Demo IdP</a>
+    </div>
+  </div>
+  <div class="cta-area">
+    <a href="/" class="auth-link login-back">Return to public landing page</a>
+  </div>
+</div>
+{{end}}

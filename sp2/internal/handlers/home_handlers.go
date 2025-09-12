@@ -47,9 +47,10 @@ type issuer struct {
 
 type HomeHandler struct {
 	cfg *config.Config
-	// separate parsed templates for home vs index (both define "content")
+	// separate parsed templates for home vs index vs login
 	tmplHome    *template.Template
 	tmplIndex   *template.Template
+	tmplLogin   *template.Template
 	idpCert     *x509.Certificate
 	replayCache map[string]time.Time // response/assertion IDs processed
 	mu          sync.Mutex
@@ -65,7 +66,17 @@ func NewHomeHandler(cfg *config.Config) *HomeHandler {
 		"internal/templates/base.html",
 		"internal/templates/partials/index.html",
 	))
-	h := &HomeHandler{cfg: cfg, tmplHome: tmplHome, tmplIndex: tmplIndex, replayCache: make(map[string]time.Time)}
+	tmplLogin := template.Must(template.ParseFiles(
+		"internal/templates/base.html",
+		"internal/templates/partials/login.html",
+	))
+	h := &HomeHandler{
+		cfg:         cfg,
+		tmplHome:    tmplHome,
+		tmplIndex:   tmplIndex,
+		tmplLogin:   tmplLogin,
+		replayCache: make(map[string]time.Time),
+	}
 	if cert, err := loadIDPCert(cfg.IDPMetadata); err == nil {
 		h.idpCert = cert
 		log.Infof("Loaded IdP signing cert (sp2)")
@@ -121,17 +132,12 @@ func loadIDPCert(path string) (*x509.Certificate, error) {
 // HandleHome enforces a simple simulated protection: if no sp2-auth cookie, initiate SAML AuthnRequest redirect.
 func (h *HomeHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("sp2-auth")
-	if err != nil {
-		// No cookie – start SSO
-		relayState := r.URL.Path
-		redirectURL, buildErr := h.buildRedirectAuthnRequest(relayState)
-		if buildErr != nil {
-			log.WithError(buildErr).Error("Failed to build SAML AuthnRequest redirect")
-			http.Error(w, "Failed to initiate SSO", http.StatusInternalServerError)
-			return
+	if err != nil { // no session -> redirect to login
+		next := r.URL.Path
+		if next == "" || !strings.HasPrefix(next, "/") {
+			next = "/home"
 		}
-		log.WithField("redirect", redirectURL).Info("Redirecting user to IdP for SSO (no cookie)")
-		http.Redirect(w, r, redirectURL, http.StatusFound)
+		http.Redirect(w, r, "/login?next="+url.QueryEscape(next), http.StatusFound)
 		return
 	}
 
@@ -377,6 +383,53 @@ func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
 	}
 	log.WithFields(log.Fields{"user": email, "roles": roles}).Info("Established SP2 session from SAML response")
 	http.Redirect(w, r, redirectTo, http.StatusFound)
+}
+
+// HandleLogin renders the IdP selection page when unauthenticated.
+func (h *HomeHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	if _, err := r.Cookie("sp2-auth"); err == nil { // already logged in
+		http.Redirect(w, r, "/home", http.StatusFound)
+		return
+	}
+	next := r.URL.Query().Get("next")
+	if next == "" || !strings.HasPrefix(next, "/") {
+		next = "/home"
+	}
+	data := models.PageData{
+		Page:     "login",
+		Title:    "Login",
+		SubTitle: "Select an Identity Provider",
+		EntityID: h.cfg.EntityID,
+	}
+	w.Header().Add("Cache-Control", "no-store")
+	if err := h.tmplLogin.Execute(w, struct {
+		models.PageData
+		Next string
+	}{PageData: data, Next: next}); err != nil {
+		log.WithError(err).Error("Failed to render login template")
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
+}
+
+// HandleLoginStart builds AuthnRequest after user chooses IdP.
+func (h *HomeHandler) HandleLoginStart(w http.ResponseWriter, r *http.Request) {
+	if _, err := r.Cookie("sp2-auth"); err == nil { // already authenticated
+		http.Redirect(w, r, "/home", http.StatusFound)
+		return
+	}
+	next := r.URL.Query().Get("next")
+	if next == "" || !strings.HasPrefix(next, "/") {
+		next = "/home"
+	}
+	redirectURL, buildErr := h.buildRedirectAuthnRequest(next)
+	if buildErr != nil {
+		log.WithError(buildErr).Error("Failed to build SAML AuthnRequest redirect (login start)")
+		http.Error(w, "Failed to initiate SSO", http.StatusInternalServerError)
+		return
+	}
+	log.WithFields(log.Fields{"relay": next, "redirect": redirectURL}).
+		Info("Initiating SAML login from /login/start (sp2)")
+	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
 func (h *HomeHandler) buildRedirectAuthnRequest(relayState string) (string, error) {

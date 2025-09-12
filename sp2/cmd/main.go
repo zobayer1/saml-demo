@@ -31,6 +31,9 @@ func main() {
 
 	// Public index (no auth required)
 	mux.HandleFunc("/", homeHandler.HandleIndex)
+	// Login selection (unauthenticated only)
+	mux.HandleFunc("/login", homeHandler.HandleLogin)
+	mux.HandleFunc("/login/start", homeHandler.HandleLoginStart)
 
 	mux.HandleFunc("/home", homeHandler.HandleHome)
 	mux.HandleFunc("/acs", homeHandler.HandleACS)
