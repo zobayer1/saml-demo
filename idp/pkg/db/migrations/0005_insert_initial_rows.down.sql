@@ -10,12 +10,12 @@ DELETE FROM users WHERE email = 'admin@idp.localhost';
 
 -- Remove SP configurations
 DELETE FROM sp_configurations WHERE sp_entity_id IN (
-    'urn:demo:sp1',
-    'urn:demo:sp2'
+    'urn:samldemo:sp1',
+    'urn:samldemo:sp2'
 );
 
 -- Remove SP providers
 DELETE FROM sp_providers WHERE entity_id IN (
-    'urn:demo:sp1',
-    'urn:demo:sp2'
+    'urn:samldemo:sp1',
+    'urn:samldemo:sp2'
 );

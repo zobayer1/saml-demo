@@ -40,10 +40,14 @@ func main() {
 	}(db.DB)
 
 	userService := services.NewUserService(db.DB)
+	// Initialize signer with same TLS cert/key (demo). Errors are non-fatal; continue unsigned if fails.
+	if err := userService.InitSigner(cfg.CertPath, cfg.KeyPath); err != nil {
+		log.WithError(err).Warn("Failed to initialize SAML signer; proceeding unsigned")
+	}
 
 	authHandler := handlers.NewAuthHandler(userService)
 	userHandler := handlers.NewUserHandler(userService)
-	ssoHandler := handlers.NewSsoHandler()
+	ssoHandler := handlers.NewSsoHandler(userService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))

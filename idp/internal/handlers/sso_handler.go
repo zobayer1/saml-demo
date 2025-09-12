@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"strings"
@@ -14,13 +15,14 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"idp/internal/models"
+	"idp/internal/services"
 	"idp/pkg/session"
 )
 
-type SsoHandler struct{}
+type SsoHandler struct{ userService *services.UserService }
 
-func NewSsoHandler() *SsoHandler {
-	return &SsoHandler{}
+func NewSsoHandler(userService *services.UserService) *SsoHandler {
+	return &SsoHandler{userService: userService}
 }
 
 func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
@@ -156,8 +158,29 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 				"sp":         authnRequest.Issuer.Value,
 				"req_id":     authnRequest.ID,
 			}).Info("User already authenticated - generating SAML response")
-			// TODO: Generate SAML response (HTTP-POST back to ACS)
-			http.Error(w, fmt.Sprintf("User %s authenticated. Ready to generate SAML response for SP: %s", userSess.Email, authnRequest.Issuer.Value), http.StatusNotImplemented)
+
+			// Build response immediately
+			samlResp, respErr := h.userService.BuildSAMLResponse(*userSess, samlContext)
+			if respErr != nil {
+				log.WithError(respErr).Error("Failed to build SAML response for existing session")
+				http.Error(w, "Failed to build SAML response", http.StatusInternalServerError)
+				return
+			}
+
+			// One-time context use - clear session context
+			delete(samlSession.Values, "saml-context")
+			if err := samlSession.Save(r, w); err != nil {
+				log.WithError(err).Warn("Failed to clear saml-context after response generation")
+			}
+
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>SAML Redirect</title></head><body onload="document.forms[0].submit()">`)
+			_, _ = fmt.Fprintf(w, `<form method="post" action="%s">`, template.HTMLEscapeString(samlContext.AssertionConsumerServiceURL))
+			_, _ = fmt.Fprintf(w, `<input type="hidden" name="SAMLResponse" value="%s"/>`, template.HTMLEscapeString(samlResp))
+			if relayState != "" {
+				_, _ = fmt.Fprintf(w, `<input type="hidden" name="RelayState" value="%s"/>`, template.HTMLEscapeString(relayState))
+			}
+			_, _ = fmt.Fprintf(w, `<noscript><p>JavaScript disabled. Click continue.</p><button type="submit">Continue</button></noscript></form></body></html>`)
 			return
 		}
 	} else {

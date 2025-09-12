@@ -2,30 +2,89 @@ package services
 
 import (
 	"context"
+	"crypto"
+	"crypto/rsa"
+	"crypto/x509"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/google/uuid"
+
+	"github.com/beevik/etree"
+	dsig "github.com/russellhaering/goxmldsig"
 
 	"idp/internal/models"
 )
 
 type UserService struct {
 	DB *sql.DB
+	// Signing materials (optional for demo until initialized)
+	idpCert    *x509.Certificate
+	privateKey *rsa.PrivateKey
 }
 
 func NewUserService(db *sql.DB) *UserService {
 	return &UserService{DB: db}
+}
+
+// InitSigner loads certificate and private key (PEM) for SAML Response signing.
+func (s *UserService) InitSigner(certPath, keyPath string) error {
+	keyPEM, err := os.ReadFile(keyPath)
+	if err != nil {
+		return fmt.Errorf("read key: %w", err)
+	}
+	var keyBlock *pem.Block
+	for {
+		keyBlock, keyPEM = pem.Decode(keyPEM)
+		if keyBlock == nil {
+			return fmt.Errorf("decode key pem: no key block found")
+		}
+		if strings.Contains(keyBlock.Type, "PRIVATE KEY") {
+			break
+		}
+	}
+	// Try PKCS1 first
+	if k, e := x509.ParsePKCS1PrivateKey(keyBlock.Bytes); e == nil {
+		s.privateKey = k
+	} else if pkcs8, e2 := x509.ParsePKCS8PrivateKey(keyBlock.Bytes); e2 == nil {
+		if rk, ok := pkcs8.(*rsa.PrivateKey); ok {
+			s.privateKey = rk
+		} else {
+			return fmt.Errorf("only RSA private keys supported (got %T)", pkcs8)
+		}
+	} else {
+		return fmt.Errorf("unsupported private key format (PKCS1/PKCS8 RSA only): %v | %v", e, e2)
+	}
+
+	certPEM, err := os.ReadFile(certPath)
+	if err != nil {
+		return fmt.Errorf("read cert: %w", err)
+	}
+	var block *pem.Block
+	block, certPEM = pem.Decode(certPEM)
+	if block == nil {
+		return fmt.Errorf("decode cert pem: empty block")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("parse cert: %w", err)
+	}
+
+	s.idpCert = cert
+	log.Infof("Initialized SAML signer: key type=*rsa.PrivateKey")
+	return nil
 }
 
 func (s *UserService) CheckEmailExists(ctx context.Context, email string) (bool, error) {
@@ -370,27 +429,36 @@ func (s *UserService) BuildSAMLResponse(
 	if err != nil {
 		return "", err
 	}
-
-	// Add xml header
 	xmlDoc := "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + string(raw)
 
-	// NOTE: Currently unsigned. TODO: integrate XML Digital Signature using goxmldsig & include <ds:Signature> within Assertion or Response.
-	// For HTTP-POST binding we base64 encode the raw XML.
-	encoded := base64.StdEncoding.EncodeToString([]byte(xmlDoc))
+	if s.privateKey != nil && s.idpCert != nil {
+		doc := etree.NewDocument()
+		if err := doc.ReadFromString(xmlDoc); err != nil {
+			log.WithError(err).Error("Failed to parse XML for signing")
+		} else {
+			ctx, _ := dsig.NewSigningContext(
+				s.privateKey,
+				[][]byte{s.idpCert.Raw},
+			)
+			ctx.Hash = crypto.SHA256
 
-	log.WithFields(log.Fields{
-		"response_id":  responseID,
-		"assertion_id": assertionID,
-		"sp":           samlContext.Issuer,
-		"acs":          samlContext.AssertionConsumerServiceURL,
-	}).Debug("Built SAML response (unsigned)")
-
-	// For debugging (optional) show truncated XML
-	if len(xmlDoc) > 512 {
-		log.Debugf("SAML Response XML (truncated 512): %s...", xmlDoc[:512])
-	} else {
-		log.Debugf("SAML Response XML: %s", xmlDoc)
+			signedElement, err := ctx.SignEnveloped(doc.Root())
+			if err != nil {
+				log.WithError(err).Error("Failed to sign SAML Response (continuing unsigned)")
+			} else {
+				doc.SetRoot(signedElement)
+				if out, err := doc.WriteToString(); err == nil {
+					xmlDoc = out
+					log.Debug("SAML Response signed successfully")
+				}
+			}
+		}
 	}
 
+	encoded := base64.StdEncoding.EncodeToString([]byte(xmlDoc))
+	log.WithFields(log.Fields{"signed": s.privateKey != nil, "sp": samlContext.Issuer}).Debug("Built SAML response")
+	if len(xmlDoc) > 512 {
+		log.Debugf("SAML Response XML (truncated 512): %s...", xmlDoc[:512])
+	}
 	return encoded, nil
 }

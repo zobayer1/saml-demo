@@ -1,25 +1,25 @@
 -- Description: Insert initial rows into the sp_providers table
 INSERT INTO sp_providers (entity_id, name, metadata_file_path, metadata_url, enabled) VALUES
 ('urn:samldemo:sp1',
- 'Demo Service Provider 1',
- 'etc/saml-metadata/sp1-metadata.xml',
+ 'Service Provider 1',
+ 'etc/saml/sp1-metadata.xml',
  NULL,
  true),
 ('urn:samldemo:sp2',
- 'Demo Service Provider 2',
- 'etc/saml-metadata/sp2-metadata.xml',
+ 'Service Provider 2',
+ 'etc/saml/sp2-metadata.xml',
  NULL,
  true);
 
 -- Description: Insert initial rows into the sp_configurations table
 INSERT INTO sp_configurations (sp_entity_id, required_attributes, attribute_mapping, access_policy) VALUES
 ('urn:samldemo:sp1',
- '["email", "name"]',
- '{"email": "email", "name": "name", "uid": "name"}',
+ '["email", "displayName"]',
+ '{"email": "email", "displayName": "username"}',
  'allow'),
 ('urn:samldemo:sp2',
- '["email", "roles", "department"]',
- '{"email": "email", "roles": "user_roles", "uid": "name"}',
+ '["email", "roles"]',
+ '{"email": "email", "roles": "user_roles", "displayName": "username"}',
  'whitelist');
 
 -- Description: Insert IDP admin user. Password plaintext used for demo: ea339aa6b55f

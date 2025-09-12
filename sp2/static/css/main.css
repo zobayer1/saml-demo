@@ -1,0 +1,525 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Header Styles */
+.header {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.nav {
+    display: flex;
+    gap: 1rem;
+}
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+}
+
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Main Content */
+.main {
+    flex: 1;
+    padding: 2rem 0;
+    display: flex;
+    align-items: center;
+    min-height: calc(100vh - 120px);
+}
+
+/* Authentication Container */
+.auth-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 480px;
+    padding: 2rem 0;
+}
+
+.auth-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    padding: 2.5rem;
+    width: 500px;
+    max-width: 675px;
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.auth-header h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+}
+
+.auth-header p {
+    color: #718096;
+    font-size: 0.95rem;
+}
+
+/* Form Styles */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-button {
+    padding-top: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.form-label {
+    font-weight: 500;
+    color: #2d3748;
+    font-size: 0.9rem;
+}
+
+.form-input, .form-select {
+    padding: 0.75rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-help {
+    font-size: 0.8rem;
+    color: #718096;
+    margin-top: 0.25rem;
+}
+
+.form-help strong {
+    color: #667eea;
+    font-weight: 600;
+}
+
+/* HTMX Feedback Styles */
+.form-feedback {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.form-feedback.error {
+    color: #dc2626;
+}
+
+.form-feedback.success {
+    color: #16a34a;
+}
+
+.form-feedback[data-strength-level="vw"] {
+    color: #dc2626; /* Very Weak - Red */
+}
+
+.form-feedback[data-strength-level="w"] {
+    color: #ea580c; /* Weak - Orange */
+}
+
+.form-feedback[data-strength-level="f"] {
+    color: #eab308; /* Fair - Yellow */
+}
+
+.form-feedback[data-strength-level="m"] {
+    color: #22c55e; /* Moderate - Green */
+}
+
+.form-feedback[data-strength-level="s"] {
+    color: #3b82f6; /* Strong - Blue */
+}
+
+.form-feedback[data-strength-level="vs"] {
+    color: #8b5cf6; /* Very Strong - Violet */
+}
+
+.form-feedback ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.form-feedback li {
+    margin: 0.25rem 0;
+}
+
+.feedback-icon {
+    font-weight: bold;
+    margin-right: 0.5rem;
+}
+
+.form-group:has([id$="-validation"] [data-validation-state="error"]) .form-input {
+    border-color: #dc2626 !important;
+    background-color: #fef2f2;
+}
+
+.form-group:has([id$="-validation"] [data-validation-state="success"]) .form-input {
+    border-color: #16a34a !important;
+    background-color: #f0fdf4;
+}
+
+/* Very Weak */
+.form-group:has([data-validation-state="strength"][data-strength-level="vw"]) .form-input {
+    border-color: #dc2626 !important;
+    background-color: #fef2f2;
+}
+
+/* Weak */
+.form-group:has([data-validation-state="strength"][data-strength-level="w"]) .form-input {
+    border-color: #ea580c !important;
+    background-color: #fff7ed;
+}
+
+/* Fair */
+.form-group:has([data-validation-state="strength"][data-strength-level="f"]) .form-input {
+    border-color: #eab308 !important;
+    background-color: #fefce8;
+}
+
+/* Moderate */
+.form-group:has([data-validation-state="strength"][data-strength-level="m"]) .form-input {
+    border-color: #22c55e !important;
+    background-color: #f0fdf4;
+}
+
+/* Strong */
+.form-group:has([data-validation-state="strength"][data-strength-level="s"]) .form-input {
+    border-color: #3b82f6 !important;
+    background-color: #eff6ff;
+}
+
+/* Very Strong */
+.form-group:has([data-validation-state="strength"][data-strength-level="vs"]) .form-input {
+    border-color: #8b5cf6 !important;
+    background-color: #f3f4f6;
+}
+
+.form-group:has([id$="-validation"] [data-validation-state]) .form-input:valid,
+.form-group:has([id$="-validation"] [data-validation-state]) .form-input:invalid {
+    border-color: inherit;
+    background-color: inherit;
+}
+
+/* Button Styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-full {
+    width: 100%;
+}
+
+.auth-footer {
+    text-align: center;
+    border-top: 1px solid #e2e8f0;
+}
+
+.auth-footer p {
+    margin-top: 1rem;
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.auth-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-link:hover {
+    text-decoration: underline;
+}
+
+/* Alert Messages */
+.alert {
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+}
+
+.alert-success {
+    background: #f0fff4;
+    border: 1px solid #9ae6b4;
+    color: #276749;
+}
+
+.alert-error {
+    background: #fed7d7;
+    border: 1px solid #feb2b2;
+    color: #c53030;
+}
+
+.alert strong {
+    font-weight: 600;
+}
+
+/* Footer */
+.footer {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1rem 0;
+    text-align: center;
+    color: white;
+    font-size: 0.9rem;
+}
+
+/* Checkbox Styles */
+.form-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.form-checkbox-input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: #667eea;
+    cursor: pointer;
+}
+
+.form-checkbox-label {
+    font-size: 0.9rem;
+    color: #4a5568;
+    cursor: pointer;
+    user-select: none;
+}
+
+.form-checkbox-input:focus {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+/* SAML Flow Information Box */
+.saml-info {
+    background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1.5rem 0;
+}
+
+.saml-info-header {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.saml-info-header h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0;
+}
+
+.saml-info-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.saml-info-body p {
+    font-size: 0.85rem;
+    color: #4a5568;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.saml-info-body strong {
+    color: #2d3748;
+    font-weight: 500;
+}
+
+/* Dashboard / Home Utilities */
+.dashboard-card { max-width: 900px; }
+.dashboard-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1.25rem; margin-bottom:1.5rem; }
+.info-panel { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:1rem; }
+.info-panel h3 { font-size:.85rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin:0 0 .5rem 0; }
+.meta-label { color:#334155; font-weight:600; font-size:.85rem; }
+.meta-block { margin-top:.5rem; }
+.role-list { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:.5rem; }
+.role-pill { background:#667eea; color:#fff; font-size:.75rem; font-weight:500; padding:.35rem .6rem; border-radius:999px; letter-spacing:.03em; }
+.no-roles { color:#64748b; font-size:.85rem; }
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 15px;
+    }
+
+    .auth-card {
+        padding: 2rem 1.5rem;
+        margin: 1rem;
+        max-width: 675px;
+    }
+
+    .header .container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .saml-info {
+        padding: 0.75rem;
+    }
+
+    .saml-info-body {
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-card {
+        padding: 1.5rem 1rem;
+        max-width: 90%;
+        margin: 1rem auto;
+    }
+
+    .auth-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .form-input, .form-select, .btn {
+        font-size: 0.95rem;
+    }
+
+    .form-checkbox {
+        margin: 0.25rem 0;
+    }
+}
+
+/* Loading States for HTMX */
+.htmx-request {
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+}
+
+.htmx-request .form-input {
+    background: #f7fafc;
+}
+
+/* Custom Focus States */
+.form-input:focus + .form-feedback {
+    opacity: 1;
+}
+
+/* Validation Icons (Optional Enhancement) */
+.form-group.has-success .form-input {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%2338a169' d='m6.564.75-3.59 3.612-1.538-1.55L0 4.26 2.974 7.25 8 2.193z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    padding-right: 2.5rem;
+}
+
+.form-group.has-error .form-input {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23e53e3e'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath d='m5.25 5.25 1.5 1.5m0-1.5-1.5 1.5'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    padding-right: 2.5rem;
+}

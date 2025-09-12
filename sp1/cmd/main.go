@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"sp1/config"
+	"sp1/internal/handlers"
 )
 
 // version (string): Set at build-time via ldflags
@@ -22,6 +23,8 @@ func main() {
 	if cfgErr != nil {
 		log.WithError(cfgErr).Fatal("Failed to load configuration")
 	}
+
+	homeHandler := handlers.NewHomeHandler(cfg)
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -41,6 +44,11 @@ func main() {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	})
+
+	// Protected resource
+	mux.HandleFunc("/home", homeHandler.HandleHome)
+	// Assertion Consumer Service endpoint (placeholder)
+	mux.HandleFunc("/acs", homeHandler.HandleACS)
 
 	server := &http.Server{
 		Addr:    cfg.Host,

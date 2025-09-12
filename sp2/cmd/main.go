@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"sp2/config"
+	"sp2/internal/handlers"
 )
 
 // version (string): Set at build-time via ldflags
@@ -23,8 +24,13 @@ func main() {
 		log.WithError(cfgErr).Fatal("Failed to load configuration")
 	}
 
+	homeHandler := handlers.NewHomeHandler(cfg)
+
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+
+	mux.HandleFunc("/home", homeHandler.HandleHome)
+	mux.HandleFunc("/acs", homeHandler.HandleACS)
 
 	mux.HandleFunc("/metadata", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")

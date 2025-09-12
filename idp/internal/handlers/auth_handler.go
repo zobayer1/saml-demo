@@ -185,9 +185,51 @@ func (h *AuthHandler) validateLogin(w http.ResponseWriter, r *http.Request) {
 
 	if samlContext != nil {
 		log.Infof("User %s authenticated successfully for SAML flow - SP: %s", user.Email, samlContext.Issuer)
-		// TODO: Validate SP authorization
-		// TODO: Generate SAML Response
-		http.Error(w, fmt.Sprintf("SAML flow detected for SP: %s", samlContext.Issuer), http.StatusNotImplemented)
+		// Build SAML Response (unsigned demo)
+		samlResp, buildErr := h.userService.BuildSAMLResponse(userSession, *samlContext)
+		if buildErr != nil {
+			log.WithError(buildErr).Error("Failed to build SAML response")
+			http.Error(w, "Failed to build SAML response", http.StatusInternalServerError)
+			return
+		}
+
+		acsURL := samlContext.AssertionConsumerServiceURL
+		relayState := samlContext.RelayState
+		if acsURL == "" {
+			log.Error("Missing ACS URL in SAML context")
+			http.Error(w, "Invalid SAML context (ACS)", http.StatusInternalServerError)
+			return
+		}
+
+		// One-time use: clear saml-context cookie
+		delete(samlSession.Values, "saml-context")
+		if err := samlSession.Save(r, w); err != nil {
+			log.WithError(err).Warn("Failed to clear saml-context session")
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// Auto-posting form per HTTP-POST binding
+		_, _ = fmt.Fprintf(
+			w,
+			`<!DOCTYPE html><html><head><title>SAML Redirect</title></head><body onload="document.forms[0].submit()">`,
+		)
+		_, _ = fmt.Fprintf(w, `<form method="post" action="%s">`, template.HTMLEscapeString(acsURL))
+		_, _ = fmt.Fprintf(
+			w,
+			`<input type="hidden" name="SAMLResponse" value="%s"/>`,
+			template.HTMLEscapeString(samlResp),
+		)
+		if relayState != "" {
+			_, _ = fmt.Fprintf(
+				w,
+				`<input type="hidden" name="RelayState" value="%s"/>`,
+				template.HTMLEscapeString(relayState),
+			)
+		}
+		_, _ = fmt.Fprintf(
+			w,
+			`<noscript><p>JavaScript disabled. Click continue.</p><button type="submit">Continue</button></noscript></form></body></html>`,
+		)
 		return
 	}
 

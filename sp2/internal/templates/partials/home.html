@@ -1,0 +1,38 @@
+{{define "content"}}
+<div class="auth-card dashboard-card">
+    <div class="auth-header">
+        <h2>{{.Title}}</h2>
+        <p>{{.SubTitle}}</p>
+    </div>
+    {{if .Email}}
+    <section class="dashboard-grid">
+        <div class="info-panel">
+            <h3>Identity</h3>
+            <p><span class="meta-label">Email:</span><br><span>{{.Email}}</span></p>
+            {{if .Username}}<p class="meta-block"><span class="meta-label">Username:</span><br><span>{{.Username}}</span></p>{{end}}
+            {{if .Status}}<p class="meta-block"><span class="meta-label">Status:</span><br><span>{{.Status}}</span></p>{{end}}
+        </div>
+        <div class="info-panel">
+            <h3>Session</h3>
+            <p><span class="meta-label">Authenticated:</span><br><span>{{if .AuthTime}}{{.AuthTime}}{{else}}(unknown){{end}}</span></p>
+            <p class="meta-block"><span class="meta-label">Issuer:</span><br><span>IdP (demo)</span></p>
+            <p class="meta-block"><span class="meta-label">SP Entity ID:</span><br><span>{{.EntityID}}</span></p>
+        </div>
+        <div class="info-panel">
+            <h3>Roles (SP2)</h3>
+            {{if .Roles}}
+            <ul class="role-list">
+                {{range .Roles}}
+                <li class="role-pill">{{.}}</li>
+                {{end}}
+            </ul>
+            {{else}}
+            <p class="no-roles">No SP2 roles</p>
+            {{end}}
+        </div>
+    </section>
+    {{else}}
+    <div class="alert alert-error"><strong>No session data.</strong> Re-authenticate to view attributes.</div>
+    {{end}}
+</div>
+{{end}}
