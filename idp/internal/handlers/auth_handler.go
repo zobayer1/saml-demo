@@ -172,16 +172,12 @@ func (h *AuthHandler) validateLogin(w http.ResponseWriter, r *http.Request) {
 
 	var samlContext *models.SAMLRequestContext
 
-	if contextData, exists := samlSession.Values["saml-context"]; exists {
-		if contextStr, ok := contextData.(string); ok {
-			samlContext, err = models.DeserializeSAMLRequestContext(contextStr)
-			if err != nil {
-				log.WithError(err).Error("Failed to deserialize SAML context - proceeding with direct login")
-			} else {
-				log.Debugf("SAML context found - SP: %s, RequestID: %s", samlContext.Issuer, samlContext.RequestID)
-			}
+	if contextStr, ok := samlSession.Values["saml-context"].(string); ok && contextStr != "" {
+		samlContext, err = models.DeserializeSAMLRequestContext(contextStr)
+		if err != nil {
+			log.WithError(err).Error("Failed to deserialize SAML context - proceeding with direct login")
 		} else {
-			log.Warn("SAML context found but not in expected string format")
+			log.Debugf("SAML context found - SP: %s, RequestID: %s", samlContext.Issuer, samlContext.RequestID)
 		}
 	} else {
 		log.Debug("No SAML context found in session - direct login flow")

@@ -8,7 +8,6 @@ import (
 
 type Config struct {
 	Host     string `envconfig:"HOST"      default:":8001"`
-	SqliteDb string `envconfig:"SQLITE_DB"                 required:"true"`
 	CertPath string `envconfig:"CERT_PATH"                 required:"true"`
 	KeyPath  string `envconfig:"KEY_PATH"                  required:"true"`
 }

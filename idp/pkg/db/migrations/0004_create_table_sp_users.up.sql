@@ -6,7 +6,10 @@ CREATE TABLE IF NOT EXISTS sp_users (
     granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- When access was granted
     granted_by VARCHAR(100),                        -- Who granted the access (admin, system, etc.)
     expires_at DATETIME,                            -- Optional: when access expires
-    UNIQUE(user_id, sp_entity_id),                  -- One access record per user-SP pair
+    UNIQUE(user_id, sp_entity_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (sp_entity_id) REFERENCES sp_providers(entity_id) ON DELETE CASCADE
 );
+
+-- Description: Create index on sp_entity_id for faster lookups
+CREATE INDEX IF NOT EXISTS idx_sp_users_sp_entity_id ON sp_users (sp_entity_id);

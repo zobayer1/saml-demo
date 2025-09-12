@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" validUntil="2025-10-12T19:21:50.896Z" entityID="urn:samldemo:sp2">
+  <SPSSODescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol" AuthnRequestsSigned="true" WantAssertionsSigned="true">
+    <KeyDescriptor use="signing">
+      <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+        <X509Data xmlns="http://www.w3.org/2000/09/xmldsig#">
+          <X509Certificate xmlns="http://www.w3.org/2000/09/xmldsig#">MIIDXzCCAkegAwIBAgIUNVE1Joq17RGpltgyeSsyskF4YAswDQYJKoZIhvcNAQELBQAwHTEbMBkGA1UEAwwSTG9jYWwgU0FNTCBEZW1vIENBMB4XDTI1MDkxMjE2MTUxNFoXDTI2MDkxMjE2MTUxNFowGDEWMBQGA1UEAwwNc3AyLmxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAN5b/6kw4ADU++azBlbQ3yXCLRpJg+yVp/YAd639eX3h8FMcc00fRysQ3zluogWGpbY43w3vIu6O8xYLvMJ1Cez2KfncfFbh6ar2R92x6ZKL8ul37h/a3EJHlFEHzvkr8bDP9kPU3rNhfhB6v1IVwuTjBrOrEwrJRuH+Sf7ram0jkL72sMWc9+IFpp/sEpWSpsRPEk30DDJaa1WkuWnmNHJV+ZnuuC0QJbq5n7rNtwpyWR6k3aLFkYcuKvw6wm4quFZqyDrwfxPTcItbGEBn0vHEf9n315pRT+DbtfHHfextjXg+Hvt6MyZZIN94F6pCulIcvKM+MHB0uorJsMV0r8UCAwEAAaOBmzCBmDALBgNVHQ8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwKQYDVR0RBCIwIIINc3AyLmxvY2FsaG9zdIIJbG9jYWxob3N0hwR/AAABMAkGA1UdEwQCMAAwHQYDVR0OBBYEFKkZHok2EMIh/ReikKxMKBZOF7w4MB8GA1UdIwQYMBaAFMKU/Ueh1z7vsnWQ4vQr7HWZnjGoMA0GCSqGSIb3DQEBCwUAA4IBAQAb1rHLbo5n+GQJAzO8O++1rvFnL6JcTC3eVv3qMdZEHoieonxOVT74lKJQ/Pkfk4aOV9x4T3PZit2Fdfoyke/MinWCVn9E497QbmVBEIvnTl2jUTh+UyTPKc58/Cim4axlqFt3yyeLuSRBMRYKCkCiLh/rKIsBb+lr2ZKskjzd4fA0qDtYqbDVrQSwjAxK4k48x7e+LhZ/NLDDY0d24G/aIUtbSChZSqtPanW1g2e+XMnnaxyaem7vpUHAtUKDdm4KElIXFp0euixqa80vXmMPkYBnQXjQDz16O+2GDqv4WNVSfN5bpjr51ouw8QANnJsv4NPnI/hKB0diaiMtSgVu</X509Certificate>
+        </X509Data>
+      </KeyInfo>
+    </KeyDescriptor>
+    <KeyDescriptor use="encryption">
+      <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+        <X509Data xmlns="http://www.w3.org/2000/09/xmldsig#">
+          <X509Certificate xmlns="http://www.w3.org/2000/09/xmldsig#">MIIDXzCCAkegAwIBAgIUNVE1Joq17RGpltgyeSsyskF4YAswDQYJKoZIhvcNAQELBQAwHTEbMBkGA1UEAwwSTG9jYWwgU0FNTCBEZW1vIENBMB4XDTI1MDkxMjE2MTUxNFoXDTI2MDkxMjE2MTUxNFowGDEWMBQGA1UEAwwNc3AyLmxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAN5b/6kw4ADU++azBlbQ3yXCLRpJg+yVp/YAd639eX3h8FMcc00fRysQ3zluogWGpbY43w3vIu6O8xYLvMJ1Cez2KfncfFbh6ar2R92x6ZKL8ul37h/a3EJHlFEHzvkr8bDP9kPU3rNhfhB6v1IVwuTjBrOrEwrJRuH+Sf7ram0jkL72sMWc9+IFpp/sEpWSpsRPEk30DDJaa1WkuWnmNHJV+ZnuuC0QJbq5n7rNtwpyWR6k3aLFkYcuKvw6wm4quFZqyDrwfxPTcItbGEBn0vHEf9n315pRT+DbtfHHfextjXg+Hvt6MyZZIN94F6pCulIcvKM+MHB0uorJsMV0r8UCAwEAAaOBmzCBmDALBgNVHQ8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwKQYDVR0RBCIwIIINc3AyLmxvY2FsaG9zdIIJbG9jYWxob3N0hwR/AAABMAkGA1UdEwQCMAAwHQYDVR0OBBYEFKkZHok2EMIh/ReikKxMKBZOF7w4MB8GA1UdIwQYMBaAFMKU/Ueh1z7vsnWQ4vQr7HWZnjGoMA0GCSqGSIb3DQEBCwUAA4IBAQAb1rHLbo5n+GQJAzO8O++1rvFnL6JcTC3eVv3qMdZEHoieonxOVT74lKJQ/Pkfk4aOV9x4T3PZit2Fdfoyke/MinWCVn9E497QbmVBEIvnTl2jUTh+UyTPKc58/Cim4axlqFt3yyeLuSRBMRYKCkCiLh/rKIsBb+lr2ZKskjzd4fA0qDtYqbDVrQSwjAxK4k48x7e+LhZ/NLDDY0d24G/aIUtbSChZSqtPanW1g2e+XMnnaxyaem7vpUHAtUKDdm4KElIXFp0euixqa80vXmMPkYBnQXjQDz16O+2GDqv4WNVSfN5bpjr51ouw8QANnJsv4NPnI/hKB0diaiMtSgVu</X509Certificate>
+        </X509Data>
+      </KeyInfo>
+    </KeyDescriptor>
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://sp2.localhost:8002/slo"></SingleLogoutService>
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://sp2.localhost:8002/slo"></SingleLogoutService>
+    <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://sp2.localhost:8002/acs" index="0"></AssertionConsumerService>
+  </SPSSODescriptor>
+</EntityDescriptor>

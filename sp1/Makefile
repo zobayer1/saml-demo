@@ -26,4 +26,4 @@ clean:
 	@rm -rf $(OUTPUT_DIR)
 	@echo "Removed $(OUTPUT_DIR)"
 
-.PHONY: all format build clean
+.PHONY: all format clean build

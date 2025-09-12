@@ -16,7 +16,7 @@ var version = "version:unknown"
 func main() {
 	log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
 	log.SetLevel(log.DebugLevel)
-	log.Infof("Service1 Provider %s\n", version)
+	log.Infof("Service#1 Provider %s\n", version)
 
 	cfg, cfgErr := config.NewConfig()
 	if cfgErr != nil {
@@ -25,6 +25,12 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+
+	mux.HandleFunc("/metadata", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.Header().Set("Content-Disposition", "inline; filename=\"sp1-metadata.xml\"")
+		http.ServeFile(w, r, "static/sp1-metadata.xml")
+	})
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

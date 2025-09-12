@@ -138,25 +138,36 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 
 	log.Debugf("SAML request context serialized and stored in session: %+v", samlContext)
 
-	// TODO: Check user authentication
-	userSession, err := session.Store.Get(r, "user-session")
+	// Retrieve and deserialize user session to determine authentication status
+	userSessionCookie, err := session.Store.Get(r, "user-session")
 	if err != nil {
-		log.WithError(err).Error("Failed to get user session")
-	}
-
-	// Check if user is already authenticated
-	if isAuth, exists := userSession.Values["is_authenticated"]; exists && isAuth == true {
-		log.Info("User already authenticated - proceeding to SAML response generation")
-		// TODO: Generate SAML response
-		http.Error(w, fmt.Sprintf("User authenticated. Ready to generate SAML response for SP: %s",
-			authnRequest.Issuer.Value), http.StatusNotImplemented)
+		log.WithError(err).Error("Session store corruption detected during login validation")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if rawUserSession, ok := userSessionCookie.Values["user-session"].(string); ok && rawUserSession != "" {
+		userSess, deserErr := models.DeserializeUserSession(rawUserSession)
+		if deserErr != nil {
+			log.WithError(deserErr).Warn("Failed to deserialize stored user session - treating as unauthenticated")
+		} else if userSess.IsAuthenticated {
+			log.WithFields(log.Fields{
+				"user":       userSess.Email,
+				"session_id": userSess.SessionID,
+				"sp":         authnRequest.Issuer.Value,
+				"req_id":     authnRequest.ID,
+			}).Info("User already authenticated - generating SAML response")
+			// TODO: Generate SAML response (HTTP-POST back to ACS)
+			http.Error(w, fmt.Sprintf("User %s authenticated. Ready to generate SAML response for SP: %s", userSess.Email, authnRequest.Issuer.Value), http.StatusNotImplemented)
+			return
+		}
+	} else {
+		log.Debug("User session key missing or empty - unauthenticated")
 	}
 
 	// User not authenticated - redirect to login page
-	log.Info("User not authenticated - redirecting to login")
+	log.WithField("sp", authnRequest.Issuer.Value).Info("User not authenticated - redirecting to login for SAML flow")
 
-	// Generate login URL with context
+	// Generate login URL with context marker
 	loginURL := "/login?saml=true"
 	log.Debugf("Redirecting to login: %s", loginURL)
 
