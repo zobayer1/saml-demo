@@ -47,19 +47,25 @@ type issuer struct {
 
 type HomeHandler struct {
 	cfg *config.Config
-	// parsed templates cached
-	tmpl        *template.Template
+	// separate parsed templates for home vs index (both define "content")
+	tmplHome    *template.Template
+	tmplIndex   *template.Template
 	idpCert     *x509.Certificate
 	replayCache map[string]time.Time // response/assertion IDs processed
 	mu          sync.Mutex
 }
 
 func NewHomeHandler(cfg *config.Config) *HomeHandler {
-	tmpl := template.Must(template.ParseFiles(
+	// parse separately so definitions don't override
+	tmplHome := template.Must(template.ParseFiles(
 		"internal/templates/base.html",
 		"internal/templates/partials/home.html",
 	))
-	h := &HomeHandler{cfg: cfg, tmpl: tmpl, replayCache: make(map[string]time.Time)}
+	tmplIndex := template.Must(template.ParseFiles(
+		"internal/templates/base.html",
+		"internal/templates/partials/index.html",
+	))
+	h := &HomeHandler{cfg: cfg, tmplHome: tmplHome, tmplIndex: tmplIndex, replayCache: make(map[string]time.Time)}
 	if cert, err := loadIDPCert(cfg.IDPMetadata); err == nil {
 		h.idpCert = cert
 		log.Infof("Loaded IdP signing cert (sp2)")
@@ -183,18 +189,36 @@ func (h *HomeHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := models.PageData{
-		Page:     "home",
-		Title:    "SP2 Home (Protected)",
-		SubTitle: "Authenticated via SAML",
-		Email:    email,
-		Username: username,
-		Status:   status,
-		Roles:    roles,
-		AuthTime: authTime,
-		EntityID: h.cfg.EntityID,
+		Page:          "home",
+		Title:         "SP2 Home (Protected)",
+		SubTitle:      "Authenticated via SAML",
+		Email:         email,
+		Username:      username,
+		Status:        status,
+		Roles:         roles,
+		AuthTime:      authTime,
+		EntityID:      h.cfg.EntityID,
+		Authenticated: true,
 	}
-	if err := h.tmpl.Execute(w, data); err != nil {
+	if err := h.tmplHome.Execute(w, data); err != nil {
 		log.WithError(err).Error("Failed to render home template")
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
+}
+
+// HandleIndex serves a public landing page that does not require authentication.
+func (h *HomeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) {
+	_, err := r.Cookie("sp2-auth")
+	auth := err == nil
+	data := models.PageData{
+		Page:          "index",
+		Title:         "SP2 Landing",
+		SubTitle:      "Public entry point (no session required)",
+		EntityID:      h.cfg.EntityID,
+		Authenticated: auth,
+	}
+	if err := h.tmplIndex.Execute(w, data); err != nil {
+		log.WithError(err).Error("Failed to render index template")
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
 }

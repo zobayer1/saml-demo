@@ -29,6 +29,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
+	// Public index (no auth required)
+	mux.HandleFunc("/", homeHandler.HandleIndex)
+
 	mux.HandleFunc("/metadata", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
 		w.Header().Set("Content-Disposition", "inline; filename=\"sp1-metadata.xml\"")

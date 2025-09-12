@@ -47,19 +47,25 @@ type issuer struct {
 
 type HomeHandler struct {
 	cfg *config.Config
-	// parsed templates cached
-	tmpl        *template.Template
+	// separate parsed templates to avoid name collision on "content"
+	tmplHome    *template.Template
+	tmplIndex   *template.Template
 	idpCert     *x509.Certificate
-	replayCache map[string]time.Time // response/assertion IDs processed
+	replayCache map[string]time.Time
 	mu          sync.Mutex
 }
 
 func NewHomeHandler(cfg *config.Config) *HomeHandler {
-	tmpl := template.Must(template.ParseFiles(
+	// parse individually so both partials can define {{define "content"}} without overriding each other
+	tmplHome := template.Must(template.ParseFiles(
 		"internal/templates/base.html",
 		"internal/templates/partials/home.html",
 	))
-	h := &HomeHandler{cfg: cfg, tmpl: tmpl, replayCache: make(map[string]time.Time)}
+	tmplIndex := template.Must(template.ParseFiles(
+		"internal/templates/base.html",
+		"internal/templates/partials/index.html",
+	))
+	h := &HomeHandler{cfg: cfg, tmplHome: tmplHome, tmplIndex: tmplIndex, replayCache: make(map[string]time.Time)}
 	if cert, err := loadIDPCert(cfg.IDPMetadata); err == nil {
 		h.idpCert = cert
 		log.Infof("Loaded IdP signing cert (SP1)")
@@ -160,18 +166,36 @@ func (h *HomeHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
 		roles = transformRolesForSP(roles, "sp1")
 	}
 	data := models.PageData{
-		Page:     "home",
-		Title:    "SP1 Home (Protected)",
-		SubTitle: "Authenticated via SAML",
-		Email:    email,
-		Username: username,
-		Status:   status,
-		Roles:    roles,
-		AuthTime: authTime,
-		EntityID: h.cfg.EntityID,
+		Page:          "home",
+		Title:         "SP1 Home (Protected)",
+		SubTitle:      "Authenticated via SAML",
+		Email:         email,
+		Username:      username,
+		Status:        status,
+		Roles:         roles,
+		AuthTime:      authTime,
+		EntityID:      h.cfg.EntityID,
+		Authenticated: true,
 	}
-	if err := h.tmpl.Execute(w, data); err != nil {
+	if err := h.tmplHome.Execute(w, data); err != nil {
 		log.WithError(err).Error("Failed to render home template")
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
+}
+
+// HandleIndex serves a public landing page that does not require authentication.
+func (h *HomeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) {
+	_, err := r.Cookie("sp1-auth")
+	auth := err == nil
+	data := models.PageData{
+		Page:          "index",
+		Title:         "SP1 Landing",
+		SubTitle:      "Public entry point (no session required)",
+		EntityID:      h.cfg.EntityID,
+		Authenticated: auth,
+	}
+	if err := h.tmplIndex.Execute(w, data); err != nil {
+		log.WithError(err).Error("Failed to render index template")
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
 }

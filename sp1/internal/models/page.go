@@ -1,11 +1,12 @@
 package models
 
 type PageData struct {
-	Page     string
-	Title    string
-	SubTitle string
-	Error    string
-	Success  string
+	Page          string
+	Title         string
+	SubTitle      string
+	Error         string
+	Success       string
+	Authenticated bool
 	// User info (optional)
 	Email    string
 	Username string

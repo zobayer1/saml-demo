@@ -16,7 +16,11 @@
         <div class="container">
             <h1 class="logo">SAML Service Provider Alpha</h1>
             <nav class="nav">
-                <a href="/home" class="nav-link">Home</a>
+                {{if .Authenticated}}
+                    <a href="/logout" class="nav-link">Logout</a>
+                {{else}}
+                    <a href="/home" class="nav-link">Home</a>
+                {{end}}
             </nav>
         </div>
     </header>

@@ -29,6 +29,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
+	// Public index (no auth required)
+	mux.HandleFunc("/", homeHandler.HandleIndex)
+
 	mux.HandleFunc("/home", homeHandler.HandleHome)
 	mux.HandleFunc("/acs", homeHandler.HandleACS)
 

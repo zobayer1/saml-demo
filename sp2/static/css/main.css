@@ -441,6 +441,14 @@ body {
 .role-pill { background:#667eea; color:#fff; font-size:.75rem; font-weight:500; padding:.35rem .6rem; border-radius:999px; letter-spacing:.03em; }
 .no-roles { color:#64748b; font-size:.85rem; }
 
+/* Landing / Public Index Page Helpers */
+.landing-card { max-width:640px; margin:0 auto; text-align:center; }
+.landing-intro { margin:1.25rem 0; }
+.intro-text { color:#4a5568; line-height:1.5; }
+.section-title { margin-bottom:0.5rem; color:#2d3748; }
+.disc-list { list-style:disc; padding-left:1.25rem; }
+.cta-area { margin-top:1.75rem; }
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {

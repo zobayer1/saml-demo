@@ -1,0 +1,22 @@
+{{define "content"}}
+<div class="auth-card landing-card">
+  <div class="auth-header">
+    <h2>{{.Title}}</h2>
+    <p>{{.SubTitle}}</p>
+  </div>
+  <div class="landing-intro">
+    <p class="intro-text">This is a public landing page for <strong>Service Provider 1</strong> in the demo SAML environment. You can access this page without an authenticated session. Use the button below to access the protected resource which will trigger a SAML login flow if you are not already authenticated.</p>
+  </div>
+  <div class="saml-info" >
+    <h3 class="section-title">Quick Info</h3>
+    <ul class="disc-list">
+      <li><strong>SP EntityID:</strong> {{.EntityID}}</li>
+      <li><a href="/metadata" class="auth-link">Download SP Metadata</a></li>
+      <li><a href="/health" class="auth-link">Health Check</a></li>
+    </ul>
+  </div>
+  <div class="cta-area">
+    <a class="btn btn-primary" href="/home">Go to Dashboard</a>
+  </div>
+</div>
+{{end}}
