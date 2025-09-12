@@ -212,8 +212,8 @@ func (h *HomeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	auth := err == nil
 	data := models.PageData{
 		Page:          "index",
-		Title:         "SP2 Landing",
-		SubTitle:      "Public entry point (no session required)",
+		Title:         "Welcome to Beta Service",
+		SubTitle:      "Public landing page for SP2",
 		EntityID:      h.cfg.EntityID,
 		Authenticated: auth,
 	}

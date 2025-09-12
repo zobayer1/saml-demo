@@ -189,8 +189,8 @@ func (h *HomeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	auth := err == nil
 	data := models.PageData{
 		Page:          "index",
-		Title:         "SP1 Landing",
-		SubTitle:      "Public entry point (no session required)",
+		Title:         "Welcome to Alpha Service",
+		SubTitle:      "Public landing page for SP1",
 		EntityID:      h.cfg.EntityID,
 		Authenticated: auth,
 	}
