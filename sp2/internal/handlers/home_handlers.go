@@ -131,8 +131,13 @@ func loadIDPCert(path string) (*x509.Certificate, error) {
 
 // HandleHome enforces a simple simulated protection: if no sp2-auth cookie, initiate SAML AuthnRequest redirect.
 func (h *HomeHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
+	// Prevent caching of protected pages (align with SP1)
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	cookie, err := r.Cookie("sp2-auth")
 	if err != nil { // no session -> redirect to login
+		// capture intended path for relay after authentication
 		next := r.URL.Path
 		if next == "" || !strings.HasPrefix(next, "/") {
 			next = "/home"
@@ -231,25 +236,41 @@ func (h *HomeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 
 // HandleACS processes the SAML Response (unsigned demo) and establishes local session.
 func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	redirectHome := func() { http.Redirect(w, r, "/home", http.StatusSeeOther) }
+	redirectLogin := func() { http.Redirect(w, r, "/login?next=%2Fhome", http.StatusSeeOther) }
+
+	if c, err := r.Cookie("sp2-auth"); err == nil && c.Value != "" {
+		if r.Method == http.MethodPost {
+			_ = r.ParseForm()
+			if rs := r.FormValue("RelayState"); rs != "" && strings.HasPrefix(rs, "/") {
+				http.Redirect(w, r, rs, http.StatusSeeOther)
+				return
+			}
+		}
+		redirectHome()
+		return
+	}
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		redirectLogin()
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		redirectLogin()
 		return
 	}
 	encoded := r.FormValue("SAMLResponse")
 	if encoded == "" {
-		http.Error(w, "Missing SAMLResponse", http.StatusBadRequest)
+		redirectLogin()
 		return
 	}
 	relayState := r.FormValue("RelayState")
 
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		log.WithError(err).Warn("Failed base64 decode of SAMLResponse")
-		http.Error(w, "Invalid SAMLResponse encoding", http.StatusBadRequest)
+		redirectLogin()
 		return
 	}
 
@@ -257,35 +278,29 @@ func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
 	if h.idpCert != nil {
 		doc := etree.NewDocument()
 		if err := doc.ReadFromBytes(decoded); err != nil {
-			log.WithError(err).Warn("Failed to parse XML for signature validation")
-			http.Error(w, "Malformed SAMLResponse XML", http.StatusBadRequest)
+			redirectLogin()
 			return
 		}
 		store := &dsig.MemoryX509CertificateStore{Roots: []*x509.Certificate{h.idpCert}}
 		ctx := dsig.NewDefaultValidationContext(store)
 		if _, err := ctx.Validate(doc.Root()); err != nil {
-			log.WithError(err).Error("SAML signature validation failed")
-			http.Error(w, "Invalid SAML signature", http.StatusForbidden)
+			redirectLogin()
 			return
 		}
 		respID := doc.Root().SelectAttrValue("ID", "")
 		inResp := doc.Root().SelectAttrValue("InResponseTo", "")
 		if respID == "" {
-			http.Error(w, "Invalid SAML Response (ID)", http.StatusBadRequest)
+			redirectLogin()
 			return
 		}
-		if h.isReplay(respID) {
-			http.Error(w, "Replay detected", http.StatusForbidden)
-			return
-		}
-		if inResp != "" && h.isReplay(inResp) {
-			http.Error(w, "Replay detected", http.StatusForbidden)
+		if h.isReplay(respID) || (inResp != "" && h.isReplay(inResp)) {
+			redirectHome()
 			return
 		}
 		if assertionEl := doc.Root().FindElement(".//saml:Assertion"); assertionEl != nil {
 			if aID := assertionEl.SelectAttrValue("ID", ""); aID != "" {
 				if h.isReplay(aID) {
-					http.Error(w, "Replay detected", http.StatusForbidden)
+					redirectHome()
 					return
 				}
 				h.markProcessed(aID)
@@ -300,13 +315,12 @@ func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
 	// Namespace-agnostic assertion parsing with etree
 	doc2 := etree.NewDocument()
 	if err := doc2.ReadFromBytes(decoded); err != nil {
-		log.WithError(err).Warn("Failed to parse SAMLResponse XML (etree)")
-		http.Error(w, "Malformed SAMLResponse XML", http.StatusBadRequest)
+		redirectLogin()
 		return
 	}
 	assertionEl := findFirst(doc2.Root(), endsWith("Assertion"))
 	if assertionEl == nil {
-		http.Error(w, "Invalid SAML Response (assertion)", http.StatusBadRequest)
+		redirectLogin()
 		return
 	}
 	nameIDEl := findFirst(assertionEl, endsWith("NameID"))
@@ -314,9 +328,8 @@ func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
 	if nameIDEl != nil {
 		email = strings.TrimSpace(nameIDEl.Text())
 	}
-	attrStmt := findFirst(assertionEl, endsWith("AttributeStatement"))
 	attrs := map[string][]string{}
-	if attrStmt != nil {
+	if attrStmt := findFirst(assertionEl, endsWith("AttributeStatement")); attrStmt != nil {
 		for _, child := range attrStmt.ChildElements() {
 			if !endsWith("Attribute")(child.Tag) {
 				continue
@@ -366,23 +379,24 @@ func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
 		AuthTime string   `json:"auth_time"`
 	}{Email: email, Username: username, Status: status, Roles: roles, AuthTime: authInstant}
 	jsonBytes, _ := json.Marshal(payload)
-	cookieVal := "j:" + base64.StdEncoding.EncodeToString(jsonBytes)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "sp2-auth",
-		Value:    cookieVal,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-		Expires:  time.Now().Add(30 * time.Minute),
-	})
+	http.SetCookie(
+		w,
+		&http.Cookie{
+			Name:     "sp2-auth",
+			Value:    "j:" + base64.StdEncoding.EncodeToString(jsonBytes),
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			Expires:  time.Now().Add(30 * time.Minute),
+		},
+	)
 
-	redirectTo := relayState
-	if redirectTo == "" || !strings.HasPrefix(redirectTo, "/") {
-		redirectTo = "/home"
+	to := relayState
+	if to == "" || !strings.HasPrefix(to, "/") {
+		to = "/home"
 	}
-	log.WithFields(log.Fields{"user": email, "roles": roles}).Info("Established SP2 session from SAML response")
-	http.Redirect(w, r, redirectTo, http.StatusFound)
+	http.Redirect(w, r, to, http.StatusSeeOther)
 }
 
 // HandleLogin renders the IdP selection page when unauthenticated.
@@ -401,7 +415,10 @@ func (h *HomeHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		SubTitle: "Select an Identity Provider",
 		EntityID: h.cfg.EntityID,
 	}
-	w.Header().Add("Cache-Control", "no-store")
+	// Strengthened cache prevention headers
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	if err := h.tmplLogin.Execute(w, struct {
 		models.PageData
 		Next string

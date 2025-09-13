@@ -8,12 +8,17 @@
     <h3 class="idp-heading">Available Identity Providers</h3>
     <p class="idp-intro">Select an IdP below to continue authentication.</p>
     <div class="idp-list">
-      <a class="btn btn-primary" href="/login/start?next={{.Next}}">Login with SAML Demo IdP</a>
+      <a class="btn btn-primary" href="/login/start?next={{.Next}}" id="login-start-link">Login with SAML Demo IdP</a>
     </div>
   </div>
   <div class="cta-area">
     <a href="/" class="auth-link login-back">Return to public landing page</a>
   </div>
 </div>
+<!-- Anti-back: if login page restored from bfcache after successful auth, force network reload so server redirects to /home -->
+<script>(function(){
+  function onShow(e){ if(e.persisted){ window.location.reload(); } }
+  window.addEventListener('pageshow', onShow);
+  window.addEventListener('unload', function(){});
+})();</script>
 {{end}}
-

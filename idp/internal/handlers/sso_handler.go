@@ -167,6 +167,9 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			// Persist a sanitized copy as last-saml for future back-button reissue (TTL via timestamp inside context)
+			samlSession.Values["last-saml"] = samlSession.Values["saml-context"]
+
 			// One-time context use - clear session context
 			delete(samlSession.Values, "saml-context")
 			if err := samlSession.Save(r, w); err != nil {

@@ -46,12 +46,15 @@ func (h *AuthHandler) getLoginForm(w http.ResponseWriter, r *http.Request) {
 			SPName:     "",
 			SPEntityID: "",
 		},
-		UserSession: models.UserSession{
-			IsAuthenticated: false,
-		},
+		UserSession: models.UserSession{IsAuthenticated: false},
 	}
 
 	isSAMLParam := r.URL.Query().Get("saml") == "true"
+	// Always apply no-store headers for login to minimize bfcache / back-button artifacts
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
 	samlSession, err := session.Store.Get(r, "saml-context")
 	if err != nil {
 		log.WithError(err).Error("Session store corrupted")
@@ -59,31 +62,115 @@ func (h *AuthHandler) getLoginForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var samlContext *models.SAMLRequestContext
 	if contextData, exists := samlSession.Values["saml-context"]; exists {
 		if contextStr, ok := contextData.(string); ok && len(contextStr) > 0 {
-			samlContext, serdeErr := models.DeserializeSAMLRequestContext(contextStr)
-			if serdeErr != nil {
+			if ctx, serdeErr := models.DeserializeSAMLRequestContext(contextStr); serdeErr == nil {
+				samlContext = ctx
+				data.SAMLState = models.SAMLState{
+					SAMLFlow:   true,
+					SPName:     extractSPName(ctx.Issuer),
+					SPEntityID: ctx.Issuer,
+				}
+				log.Debugf("SAML flow detected from session - SP: %s", ctx.Issuer)
+			} else {
 				log.WithError(serdeErr).Error("Failed to deserialize SAML context")
 				http.Error(w, serdeErr.Error(), http.StatusInternalServerError)
 				return
 			}
-			data.SAMLState = models.SAMLState{
-				SAMLFlow:   true,
-				SPName:     extractSPName(samlContext.Issuer),
-				SPEntityID: samlContext.Issuer,
-			}
-			log.Debugf("SAML flow detected from session - SP: %s", samlContext.Issuer)
-		} else {
+		} else if isSAMLParam {
 			log.Error("SAML context not found in session")
-			http.Error(w, "Session context invalid", http.StatusInternalServerError)
-			return
+			data.Error = "SAML session expired. Please try again from your application."
 		}
-	}
-
-	if isSAMLParam && !data.SAMLState.SAMLFlow {
+	} else if isSAMLParam {
+		// saml=true but no context key stored
 		data.Error = "SAML session expired. Please try again from your application."
 	}
 
+	// Check existing user authentication state
+	userSessionCookie, err := session.Store.Get(r, "user-session")
+	if err != nil {
+		log.WithError(err).Error("Failed to load user-session cookie")
+	} else if rawUserSession, ok := userSessionCookie.Values["user-session"].(string); ok && rawUserSession != "" {
+		if userSess, deserErr := models.DeserializeUserSession(rawUserSession); deserErr == nil && userSess.IsAuthenticated {
+			data.UserSession = *userSess
+			// If we have both an authenticated user and an active SAML context, immediately issue SAMLResponse
+			if samlContext != nil {
+				log.WithFields(log.Fields{"user": userSess.Email, "sp": samlContext.Issuer, "req_id": samlContext.RequestID}).Info("Authenticated user hitting login during SAML flow - auto-responding")
+				samlResp, buildErr := h.userService.BuildSAMLResponse(*userSess, *samlContext)
+				if buildErr != nil {
+					log.WithError(buildErr).Error("Failed to build SAML response in login auto-redirect")
+					http.Error(w, "Failed to build SAML response", http.StatusInternalServerError)
+					return
+				}
+				// One-time use: clear context
+				delete(samlSession.Values, "saml-context")
+				_ = samlSession.Save(r, w)
+				acsURL := samlContext.AssertionConsumerServiceURL
+				if acsURL == "" {
+					log.Error("Missing ACS URL in SAML context (login auto-redirect)")
+					http.Error(w, "Invalid SAML context (ACS)", http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				_, _ = fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>SAML Redirect</title></head><body onload="document.forms[0].submit()">`)
+				_, _ = fmt.Fprintf(w, `<form method="post" action="%s">`, template.HTMLEscapeString(acsURL))
+				_, _ = fmt.Fprintf(w, `<input type="hidden" name="SAMLResponse" value="%s"/>`, template.HTMLEscapeString(samlResp))
+				if samlContext.RelayState != "" {
+					_, _ = fmt.Fprintf(w, `<input type="hidden" name="RelayState" value="%s"/>`, template.HTMLEscapeString(samlContext.RelayState))
+				}
+				_, _ = fmt.Fprintf(w, `<noscript><p>JavaScript disabled. Click continue.</p><button type="submit">Continue</button></noscript></form></body></html>`)
+				return
+			}
+		}
+	}
+
+	// Fallback: user authenticated, no active saml-context, but back navigation includes saml=true and we retained last-saml
+	if samlContext == nil && isSAMLParam && data.UserSession.IsAuthenticated {
+		if lastRaw, ok := samlSession.Values["last-saml"].(string); ok && lastRaw != "" {
+			if lastCtx, err := models.DeserializeSAMLRequestContext(lastRaw); err == nil {
+				// TTL 10 minutes from original capture
+				if time.Since(lastCtx.RequestTimestamp) < 10*time.Minute {
+					log.WithFields(log.Fields{"user": data.UserSession.Email, "sp": lastCtx.Issuer}).
+						Info("Reissuing SAML response using cached last-saml context (back navigation)")
+					if samlResp, buildErr := h.userService.BuildSAMLResponse(data.UserSession, *lastCtx); buildErr == nil {
+						w.Header().Set("Content-Type", "text/html; charset=utf-8")
+						_, _ = fmt.Fprintf(
+							w,
+							`<!DOCTYPE html><html><head><title>SAML Redirect</title></head><body onload="document.forms[0].submit()">`,
+						)
+						_, _ = fmt.Fprintf(
+							w,
+							`<form method="post" action="%s">`,
+							template.HTMLEscapeString(lastCtx.AssertionConsumerServiceURL),
+						)
+						_, _ = fmt.Fprintf(
+							w,
+							`<input type="hidden" name="SAMLResponse" value="%s"/>`,
+							template.HTMLEscapeString(samlResp),
+						)
+						if lastCtx.RelayState != "" {
+							_, _ = fmt.Fprintf(
+								w,
+								`<input type="hidden" name="RelayState" value="%s"/>`,
+								template.HTMLEscapeString(lastCtx.RelayState),
+							)
+						}
+						_, _ = fmt.Fprintf(
+							w,
+							`<noscript><p>JavaScript disabled. Click continue.</p><button type="submit">Continue</button></noscript></form></body></html>`,
+						)
+						return
+					} else {
+						log.WithError(buildErr).Warn("Failed to build SAML response from last-saml context")
+					}
+				} else {
+					log.WithField("age", time.Since(lastCtx.RequestTimestamp)).Info("Cached last-saml context expired; rendering login")
+				}
+			}
+		}
+	}
+	// If still here, render login form
 	h.renderLoginPage(w, data)
 }
 
@@ -192,7 +279,6 @@ func (h *AuthHandler) validateLogin(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to build SAML response", http.StatusInternalServerError)
 			return
 		}
-
 		acsURL := samlContext.AssertionConsumerServiceURL
 		relayState := samlContext.RelayState
 		if acsURL == "" {
@@ -200,7 +286,10 @@ func (h *AuthHandler) validateLogin(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid SAML context (ACS)", http.StatusInternalServerError)
 			return
 		}
-
+		// Persist copy for back-button reuse BEFORE clearing
+		if rawCtx, ok := samlSession.Values["saml-context"].(string); ok && rawCtx != "" {
+			samlSession.Values["last-saml"] = rawCtx
+		}
 		// One-time use: clear saml-context cookie
 		delete(samlSession.Values, "saml-context")
 		if err := samlSession.Save(r, w); err != nil {
