@@ -29,13 +29,14 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
-	// Public index (no auth required)
 	mux.HandleFunc("/", homeHandler.HandleIndex)
-	// Login selection (unauthenticated only)
 	mux.HandleFunc("/login", homeHandler.HandleLogin)
 	mux.HandleFunc("/login/start", homeHandler.HandleLoginStart)
 	mux.HandleFunc("/logout", homeHandler.HandleLogout)
 	mux.HandleFunc("/slo/complete", homeHandler.HandleSLOComplete)
+
+	mux.HandleFunc("/home", homeHandler.HandleHome)
+	mux.HandleFunc("/acs", homeHandler.HandleACS)
 
 	mux.HandleFunc("/metadata", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
@@ -52,11 +53,6 @@ func main() {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	})
-
-	// Protected resource
-	mux.HandleFunc("/home", homeHandler.HandleHome)
-	// Assertion Consumer Service endpoint (placeholder)
-	mux.HandleFunc("/acs", homeHandler.HandleACS)
 
 	server := &http.Server{
 		Addr:    cfg.Host,

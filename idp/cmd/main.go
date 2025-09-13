@@ -40,7 +40,6 @@ func main() {
 	}(db.DB)
 
 	userService := services.NewUserService(db.DB)
-	// Initialize signer with same TLS cert/key (demo). Errors are non-fatal; continue unsigned if fails.
 	if err := userService.InitSigner(cfg.CertPath, cfg.KeyPath); err != nil {
 		log.WithError(err).Warn("Failed to initialize SAML signer; proceeding unsigned")
 	}

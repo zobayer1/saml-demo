@@ -50,7 +50,7 @@ func (h *AuthHandler) getLoginForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	isSAMLParam := r.URL.Query().Get("saml") == "true"
-	// Always apply no-store headers for login to minimize bfcache / back-button artifacts
+
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Expires", "0")
@@ -69,7 +69,7 @@ func (h *AuthHandler) getLoginForm(w http.ResponseWriter, r *http.Request) {
 				samlContext = ctx
 				data.SAMLState = models.SAMLState{
 					SAMLFlow:   true,
-					SPName:     extractSPName(ctx.Issuer),
+					SPName:     helpers.ExtractSPName(ctx.Issuer),
 					SPEntityID: ctx.Issuer,
 				}
 				log.Debugf("SAML flow detected from session - SP: %s", ctx.Issuer)
@@ -83,27 +83,27 @@ func (h *AuthHandler) getLoginForm(w http.ResponseWriter, r *http.Request) {
 			data.Error = "SAML session expired. Please try again from your application."
 		}
 	} else if isSAMLParam {
-		// saml=true but no context key stored
 		data.Error = "SAML session expired. Please try again from your application."
 	}
 
-	// Check existing user authentication state
 	userSessionCookie, err := session.Store.Get(r, "user-session")
 	if err != nil {
 		log.WithError(err).Error("Failed to load user-session cookie")
 	} else if rawUserSession, ok := userSessionCookie.Values["user-session"].(string); ok && rawUserSession != "" {
 		if userSess, deserErr := models.DeserializeUserSession(rawUserSession); deserErr == nil && userSess.IsAuthenticated {
 			data.UserSession = *userSess
-			// If we have both an authenticated user and an active SAML context, immediately issue SAMLResponse
+
 			if samlContext != nil {
-				log.WithFields(log.Fields{"user": userSess.Email, "sp": samlContext.Issuer, "req_id": samlContext.RequestID}).Info("Authenticated user hitting login during SAML flow - auto-responding")
+				log.WithFields(
+					log.Fields{"user": userSess.Email, "sp": samlContext.Issuer, "req_id": samlContext.RequestID},
+				).Info("Authenticated user hitting login during SAML flow - auto-responding")
 				samlResp, buildErr := h.userService.BuildSAMLResponse(*userSess, *samlContext)
 				if buildErr != nil {
 					log.WithError(buildErr).Error("Failed to build SAML response in login auto-redirect")
 					http.Error(w, "Failed to build SAML response", http.StatusInternalServerError)
 					return
 				}
-				// One-time use: clear context
+
 				delete(samlSession.Values, "saml-context")
 				_ = samlSession.Save(r, w)
 				acsURL := samlContext.AssertionConsumerServiceURL
@@ -125,11 +125,10 @@ func (h *AuthHandler) getLoginForm(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Fallback: user authenticated, no active saml-context, but back navigation includes saml=true and we retained last-saml
 	if samlContext == nil && isSAMLParam && data.UserSession.IsAuthenticated {
 		if lastRaw, ok := samlSession.Values["last-saml"].(string); ok && lastRaw != "" {
 			if lastCtx, err := models.DeserializeSAMLRequestContext(lastRaw); err == nil {
-				// TTL 10 minutes from original capture
+
 				if time.Since(lastCtx.RequestTimestamp) < 10*time.Minute {
 					log.WithFields(log.Fields{"user": data.UserSession.Email, "sp": lastCtx.Issuer}).
 						Info("Reissuing SAML response using cached last-saml context (back navigation)")
@@ -170,7 +169,7 @@ func (h *AuthHandler) getLoginForm(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// If still here, render login form
+
 	h.renderLoginPage(w, data)
 }
 
@@ -272,7 +271,7 @@ func (h *AuthHandler) validateLogin(w http.ResponseWriter, r *http.Request) {
 
 	if samlContext != nil {
 		log.Infof("User %s authenticated successfully for SAML flow - SP: %s", user.Email, samlContext.Issuer)
-		// Build SAML Response (unsigned demo)
+
 		samlResp, buildErr := h.userService.BuildSAMLResponse(userSession, *samlContext)
 		if buildErr != nil {
 			log.WithError(buildErr).Error("Failed to build SAML response")
@@ -286,18 +285,18 @@ func (h *AuthHandler) validateLogin(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid SAML context (ACS)", http.StatusInternalServerError)
 			return
 		}
-		// Persist copy for back-button reuse BEFORE clearing
+
 		if rawCtx, ok := samlSession.Values["saml-context"].(string); ok && rawCtx != "" {
 			samlSession.Values["last-saml"] = rawCtx
 		}
-		// One-time use: clear saml-context cookie
+
 		delete(samlSession.Values, "saml-context")
 		if err := samlSession.Save(r, w); err != nil {
 			log.WithError(err).Warn("Failed to clear saml-context session")
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		// Auto-posting form per HTTP-POST binding
+
 		_, _ = fmt.Fprintf(
 			w,
 			`<!DOCTYPE html><html><head><title>SAML Redirect</title></head><body onload="document.forms[0].submit()">`,
@@ -322,9 +321,8 @@ func (h *AuthHandler) validateLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. Direct login flow - Redirect to dashboard
 	log.Infof("User %s authenticated successfully - direct login flow", user.Email)
-	// TODO: Redirect to dashboard
+
 	http.Error(w, "Direct login successful - dashboard redirect not implemented", http.StatusNotImplemented)
 }
 
@@ -337,22 +335,4 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
-}
-
-// Helper function to extract a friendly SP name from entity ID
-func extractSPName(entityID string) string {
-	// For demo purposes, extract from URL or use a simple mapping
-	if strings.Contains(entityID, "sp1") {
-		return "Service Provider 1"
-	} else if strings.Contains(entityID, "sp2") {
-		return "Service Provider 2"
-	}
-	// Fallback: try to extract domain from URL
-	if strings.HasPrefix(entityID, "http") {
-		parts := strings.Split(entityID, "/")
-		if len(parts) > 2 {
-			return parts[2] // domain part
-		}
-	}
-	return "External Service"
 }

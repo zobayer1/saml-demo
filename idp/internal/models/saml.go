@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type Issuer struct {
+type IssuerSP struct {
 	Value string `xml:",chardata"`
 }
 
@@ -18,7 +18,7 @@ type AuthnRequest struct {
 	Destination                 string   `xml:",attr"`
 	AssertionConsumerServiceURL string   `xml:",attr"`
 	ProtocolBinding             string   `xml:",attr"`
-	Issuer                      Issuer   `xml:"urn:oasis:names:tc:SAML:2.0:assertion Issuer"`
+	Issuer                      IssuerSP `xml:"urn:oasis:names:tc:SAML:2.0:assertion Issuer"`
 }
 
 type SAMLState struct {
@@ -46,7 +46,6 @@ type SPAuthContext struct {
 	IsAuthorized     bool              // Whether user can access this SP
 }
 
-// Serialize converts SAMLRequestContext to JSON string for session storage
 func (s *SAMLRequestContext) Serialize() (string, error) {
 	data, err := json.Marshal(s)
 	if err != nil {
@@ -55,7 +54,6 @@ func (s *SAMLRequestContext) Serialize() (string, error) {
 	return string(data), nil
 }
 
-// DeserializeSAMLRequestContext converts JSON string back to SAMLRequestContext
 func DeserializeSAMLRequestContext(data string) (*SAMLRequestContext, error) {
 	var ctx SAMLRequestContext
 	err := json.Unmarshal([]byte(data), &ctx)
@@ -65,21 +63,10 @@ func DeserializeSAMLRequestContext(data string) (*SAMLRequestContext, error) {
 	return &ctx, nil
 }
 
-// Serialize converts SPAuthContext to JSON string for session storage
 func (s *SPAuthContext) Serialize() (string, error) {
 	data, err := json.Marshal(s)
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
-}
-
-// DeserializeSPAuthContext converts JSON string back to SPAuthContext
-func DeserializeSPAuthContext(data string) (*SPAuthContext, error) {
-	var ctx SPAuthContext
-	err := json.Unmarshal([]byte(data), &ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &ctx, nil
 }

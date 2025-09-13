@@ -7,10 +7,9 @@ import (
 )
 
 type Config struct {
-	Host     string `envconfig:"HOST"           default:":8002"`
-	CertPath string `envconfig:"CERT_PATH"                                                        required:"true"`
-	KeyPath  string `envconfig:"KEY_PATH"                                                         required:"true"`
-	// SAML specific settings for initiating AuthnRequest
+	Host         string `envconfig:"HOST"           default:":8002"`
+	CertPath     string `envconfig:"CERT_PATH"                                                        required:"true"`
+	KeyPath      string `envconfig:"KEY_PATH"                                                         required:"true"`
 	IDPSSOURL    string `envconfig:"IDP_SSO_URL"    default:"https://idp.localhost:8000/sso"`
 	IDPSLOURL    string `envconfig:"IDP_SLO_URL"    default:"https://idp.localhost:8000/slo"`
 	EntityID     string `envconfig:"ENTITY_ID"      default:"urn:samldemo:sp2"`

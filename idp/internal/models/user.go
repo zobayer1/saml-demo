@@ -64,7 +64,6 @@ func (u *UserSession) Serialize() (string, error) {
 	return string(data), nil
 }
 
-// DeserializeUserSession converts JSON string back into a UserSession struct
 func DeserializeUserSession(data string) (*UserSession, error) {
 	var us UserSession
 	if err := json.Unmarshal([]byte(data), &us); err != nil {

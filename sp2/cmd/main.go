@@ -29,14 +29,11 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
-	// Public index (no auth required)
 	mux.HandleFunc("/", homeHandler.HandleIndex)
-	// Login selection (unauthenticated only)
 	mux.HandleFunc("/login", homeHandler.HandleLogin)
 	mux.HandleFunc("/login/start", homeHandler.HandleLoginStart)
 	mux.HandleFunc("/logout", homeHandler.HandleLogout)
 	mux.HandleFunc("/slo/complete", homeHandler.HandleSLOComplete)
-
 	mux.HandleFunc("/home", homeHandler.HandleHome)
 	mux.HandleFunc("/acs", homeHandler.HandleACS)
 

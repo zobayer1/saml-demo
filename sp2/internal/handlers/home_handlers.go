@@ -28,36 +28,17 @@ import (
 	"sp2/internal/models"
 )
 
-// Minimal AuthnRequest model for SP-initiated SSO (Redirect binding)
-// Matches the structure expected by the IdP's parser.
-type authnRequest struct {
-	XMLName                     xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:protocol AuthnRequest"`
-	ID                          string   `xml:",attr"`
-	Version                     string   `xml:",attr"`
-	IssueInstant                string   `xml:",attr"`
-	Destination                 string   `xml:",attr"`
-	AssertionConsumerServiceURL string   `xml:",attr"`
-	ProtocolBinding             string   `xml:",attr"`
-	Issuer                      issuer   `xml:"urn:oasis:names:tc:SAML:2.0:assertion Issuer"`
-}
-
-type issuer struct {
-	Value string `xml:",chardata"`
-}
-
 type HomeHandler struct {
-	cfg *config.Config
-	// separate parsed templates for home vs index vs login
+	cfg         *config.Config
 	tmplHome    *template.Template
 	tmplIndex   *template.Template
 	tmplLogin   *template.Template
 	idpCert     *x509.Certificate
-	replayCache map[string]time.Time // response/assertion IDs processed
+	replayCache map[string]time.Time
 	mu          sync.Mutex
 }
 
 func NewHomeHandler(cfg *config.Config) *HomeHandler {
-	// parse separately so definitions don't override
 	tmplHome := template.Must(template.ParseFiles(
 		"internal/templates/base.html",
 		"internal/templates/partials/home.html",
@@ -129,15 +110,12 @@ func loadIDPCert(path string) (*x509.Certificate, error) {
 	return nil, errors.New("no X509Certificate element found")
 }
 
-// HandleHome enforces a simple simulated protection: if no sp2-auth cookie, initiate SAML AuthnRequest redirect.
 func (h *HomeHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
-	// Prevent caching of protected pages (align with SP1)
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Expires", "0")
 	cookie, err := r.Cookie("sp2-auth")
-	if err != nil { // no session -> redirect to login
-		// capture intended path for relay after authentication
+	if err != nil {
 		next := r.URL.Path
 		if next == "" || !strings.HasPrefix(next, "/") {
 			next = "/home"
@@ -175,7 +153,6 @@ func (h *HomeHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
 			jsonCookie = false
 		}
 	} else {
-		// Legacy cookie with only email – force re-auth to hydrate attributes
 		if unesc, err := url.QueryUnescape(raw); err == nil {
 			email = unesc
 		} else {
@@ -185,7 +162,6 @@ func (h *HomeHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
 		jsonCookie = false
 	}
 
-	// If we don't have a proper JSON cookie OR critical fields missing -> trigger fresh SSO
 	if !jsonCookie || email == "" {
 		relayState := r.URL.Path
 		redirectURL, buildErr := h.buildRedirectAuthnRequest(relayState)
@@ -217,7 +193,6 @@ func (h *HomeHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleIndex serves a public landing page that does not require authentication.
 func (h *HomeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	_, err := r.Cookie("sp2-auth")
 	auth := err == nil
@@ -234,7 +209,6 @@ func (h *HomeHandler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleACS processes the SAML Response (unsigned demo) and establishes local session.
 func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
@@ -274,7 +248,6 @@ func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Signature validation & replay protection
 	if h.idpCert != nil {
 		doc := etree.NewDocument()
 		if err := doc.ReadFromBytes(decoded); err != nil {
@@ -312,7 +285,6 @@ func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Namespace-agnostic assertion parsing with etree
 	doc2 := etree.NewDocument()
 	if err := doc2.ReadFromBytes(decoded); err != nil {
 		redirectLogin()
@@ -399,9 +371,8 @@ func (h *HomeHandler) HandleACS(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, to, http.StatusSeeOther)
 }
 
-// HandleLogin renders the IdP selection page when unauthenticated.
 func (h *HomeHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
-	if _, err := r.Cookie("sp2-auth"); err == nil { // already logged in
+	if _, err := r.Cookie("sp2-auth"); err == nil {
 		http.Redirect(w, r, "/home", http.StatusFound)
 		return
 	}
@@ -415,7 +386,6 @@ func (h *HomeHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		SubTitle: "Select an Identity Provider",
 		EntityID: h.cfg.EntityID,
 	}
-	// Strengthened cache prevention headers
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Expires", "0")
@@ -428,9 +398,8 @@ func (h *HomeHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleLoginStart builds AuthnRequest after user chooses IdP.
 func (h *HomeHandler) HandleLoginStart(w http.ResponseWriter, r *http.Request) {
-	if _, err := r.Cookie("sp2-auth"); err == nil { // already authenticated
+	if _, err := r.Cookie("sp2-auth"); err == nil {
 		http.Redirect(w, r, "/home", http.StatusFound)
 		return
 	}
@@ -454,20 +423,19 @@ func (h *HomeHandler) buildRedirectAuthnRequest(relayState string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	req := authnRequest{
+	req := models.AuthnRequest{
 		ID:                          id,
 		Version:                     "2.0",
 		IssueInstant:                time.Now().UTC().Format(time.RFC3339),
 		Destination:                 h.cfg.IDPSSOURL,
 		AssertionConsumerServiceURL: h.cfg.ACSURL,
 		ProtocolBinding:             "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
-		Issuer:                      issuer{Value: h.cfg.EntityID},
+		Issuer:                      models.Issuer{Value: h.cfg.EntityID},
 	}
 	xmlBytes, err := xml.Marshal(req)
 	if err != nil {
 		return "", fmt.Errorf("marshal authn request: %w", err)
 	}
-	// Deflate (raw, no zlib headers) per SAML HTTP-Redirect binding
 	var buf bytes.Buffer
 	w, _ := flate.NewWriter(&buf, flate.DefaultCompression)
 	if _, err = w.Write(xmlBytes); err != nil {
@@ -483,26 +451,6 @@ func (h *HomeHandler) buildRedirectAuthnRequest(relayState string) (string, erro
 	return h.cfg.IDPSSOURL + "?" + values.Encode(), nil
 }
 
-// Minimal LogoutRequest model and helpers for SP2 SLO
-type logoutRequest struct {
-	XMLName      xml.Name      `xml:"urn:oasis:names:tc:SAML:2.0:protocol LogoutRequest"`
-	ID           string        `xml:",attr"`
-	Version      string        `xml:",attr"`
-	IssueInstant string        `xml:",attr"`
-	Destination  string        `xml:",attr"`
-	Issuer       issuer        `xml:"urn:oasis:names:tc:SAML:2.0:assertion Issuer"`
-	NameID       nameID        `xml:"urn:oasis:names:tc:SAML:2.0:assertion NameID"`
-	SessionIndex *sessionIndex `xml:"SessionIndex,omitempty"`
-}
-
-type nameID struct {
-	Value string `xml:",chardata"`
-}
-type sessionIndex struct {
-	Value string `xml:",chardata"`
-}
-
-// HandleLogout initiates SP2 SLO
 func (h *HomeHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	var nameIDVal string
 	if c, err := r.Cookie("sp2-auth"); err == nil {
@@ -534,7 +482,6 @@ func (h *HomeHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, sloURL, http.StatusFound)
 }
 
-// HandleSLOComplete consumes optional LogoutResponse and returns to landing page
 func (h *HomeHandler) HandleSLOComplete(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
@@ -544,14 +491,14 @@ func (h *HomeHandler) buildLogoutRedirect(nameIDVal, sessIndex, relayReturn stri
 	if err != nil {
 		return "", err
 	}
-	lr := logoutRequest{
+	lr := models.LogoutRequest{
 		ID:           id,
 		Version:      "2.0",
 		IssueInstant: time.Now().UTC().Format(time.RFC3339),
 		Destination:  h.cfg.IDPSLOURL,
-		Issuer:       issuer{Value: h.cfg.EntityID},
-		NameID:       nameID{Value: nameIDVal},
-		SessionIndex: &sessionIndex{Value: sessIndex},
+		Issuer:       models.Issuer{Value: h.cfg.EntityID},
+		NameID:       models.NameID{Value: nameIDVal},
+		SessionIndex: &models.SessionIndex{Value: sessIndex},
 	}
 	xmlBytes, err := xml.Marshal(lr)
 	if err != nil {
@@ -620,7 +567,7 @@ func transformRolesForSP(raw []string, spPrefix string) []string {
 					idpFallback = append(idpFallback, val)
 				}
 			}
-		} else { // no prefix
+		} else {
 			if _, ok := seen[r]; !ok {
 				spRoles = append(spRoles, r)
 				seen[r] = struct{}{}

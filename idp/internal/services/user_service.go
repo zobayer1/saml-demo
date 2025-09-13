@@ -29,8 +29,7 @@ import (
 )
 
 type UserService struct {
-	DB *sql.DB
-	// Signing materials (optional for demo until initialized)
+	DB         *sql.DB
 	idpCert    *x509.Certificate
 	privateKey *rsa.PrivateKey
 }
@@ -39,7 +38,6 @@ func NewUserService(db *sql.DB) *UserService {
 	return &UserService{DB: db}
 }
 
-// InitSigner loads certificate and private key (PEM) for SAML Response signing.
 func (s *UserService) InitSigner(certPath, keyPath string) error {
 	keyPEM, err := os.ReadFile(keyPath)
 	if err != nil {
@@ -55,7 +53,7 @@ func (s *UserService) InitSigner(certPath, keyPath string) error {
 			break
 		}
 	}
-	// Try PKCS1 first
+
 	if k, e := x509.ParsePKCS1PrivateKey(keyBlock.Bytes); e == nil {
 		s.privateKey = k
 	} else if pkcs8, e2 := x509.ParsePKCS8PrivateKey(keyBlock.Bytes); e2 == nil {
@@ -203,11 +201,6 @@ func (s *UserService) BuildSAMLResponse(
 	userSession models.UserSession,
 	samlContext models.SAMLRequestContext,
 ) (string, error) {
-	// Contract:
-	// Inputs: authenticated user session + captured SAMLRequestContext
-	// Output: base64 encoded SAML Response XML (currently unsigned)
-	// Errors: validation failures or serialization errors
-
 	if !userSession.IsAuthenticated {
 		return "", errors.New("user not authenticated")
 	}
@@ -215,14 +208,12 @@ func (s *UserService) BuildSAMLResponse(
 		return "", errors.New("incomplete SAML request context")
 	}
 
-	// Static / derived IDP entityID. In a fuller implementation this could be loaded from config or metadata parsing.
 	idpEntityID := "https://idp.localhost:8000"
 
 	now := time.Now().UTC()
 	assertionID := "_" + uuid.New().String()
 	responseID := "_" + uuid.New().String()
 
-	// Helper to format time per SAML spec (xs:dateTime, UTC, RFC3339 without nanoseconds)
 	formatTime := func(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05Z") }
 
 	notOnOrAfter := now.Add(5 * time.Minute)
@@ -232,10 +223,8 @@ func (s *UserService) BuildSAMLResponse(
 		authnInstant = now
 	}
 
-	// Prepare role values (stable order for deterministic output)
 	var roleValues []string
 	for k, v := range userSession.UserRoles {
-		// combine key:value or just value if value empty
 		if v != "" {
 			roleValues = append(roleValues, fmt.Sprintf("%s:%s", k, v))
 		} else {
@@ -244,173 +233,72 @@ func (s *UserService) BuildSAMLResponse(
 	}
 	sort.Strings(roleValues)
 
-	// XML structure definitions (minimal set for demo)
-	type AttributeValue struct {
-		XMLName xml.Name `xml:"saml:AttributeValue"`
-		Type    string   `xml:"xsi:type,attr,omitempty"`
-		Value   string   `xml:",chardata"`
-	}
-	type Attribute struct {
-		XMLName       xml.Name         `xml:"saml:Attribute"`
-		Name          string           `xml:"Name,attr"`
-		NameFormat    string           `xml:"NameFormat,attr,omitempty"`
-		AttributeVals []AttributeValue `xml:"saml:AttributeValue"`
-	}
-	type StatusCode struct {
-		XMLName xml.Name `xml:"samlp:StatusCode"`
-		Value   string   `xml:"Value,attr"`
-	}
-	type Status struct {
-		XMLName    xml.Name   `xml:"samlp:Status"`
-		StatusCode StatusCode `xml:"samlp:StatusCode"`
-	}
-	type SubjectConfirmationData struct {
-		XMLName      xml.Name `xml:"saml:SubjectConfirmationData"`
-		InResponseTo string   `xml:"InResponseTo,attr"`
-		NotOnOrAfter string   `xml:"NotOnOrAfter,attr"`
-		Recipient    string   `xml:"Recipient,attr"`
-	}
-	type SubjectConfirmation struct {
-		XMLName                 xml.Name                `xml:"saml:SubjectConfirmation"`
-		Method                  string                  `xml:"Method,attr"`
-		SubjectConfirmationData SubjectConfirmationData `xml:"saml:SubjectConfirmationData"`
-	}
-	type NameID struct {
-		XMLName xml.Name `xml:"saml:NameID"`
-		Format  string   `xml:"Format,attr"`
-		Value   string   `xml:",chardata"`
-	}
-	type Subject struct {
-		XMLName              xml.Name              `xml:"saml:Subject"`
-		NameID               NameID                `xml:"saml:NameID"`
-		SubjectConfirmations []SubjectConfirmation `xml:"saml:SubjectConfirmation"`
-	}
-	type Audience struct {
-		XMLName xml.Name `xml:"saml:Audience"`
-		Value   string   `xml:",chardata"`
-	}
-	type AudienceRestriction struct {
-		XMLName  xml.Name `xml:"saml:AudienceRestriction"`
-		Audience Audience `xml:"saml:Audience"`
-	}
-	type Conditions struct {
-		XMLName             xml.Name            `xml:"saml:Conditions"`
-		NotBefore           string              `xml:"NotBefore,attr"`
-		NotOnOrAfter        string              `xml:"NotOnOrAfter,attr"`
-		AudienceRestriction AudienceRestriction `xml:"saml:AudienceRestriction"`
-	}
-	type AuthnContextClassRef struct {
-		XMLName xml.Name `xml:"saml:AuthnContextClassRef"`
-		Value   string   `xml:",chardata"`
-	}
-	type AuthnContext struct {
-		XMLName              xml.Name             `xml:"saml:AuthnContext"`
-		AuthnContextClassRef AuthnContextClassRef `xml:"saml:AuthnContextClassRef"`
-	}
-	type AuthnStatement struct {
-		XMLName      xml.Name     `xml:"saml:AuthnStatement"`
-		AuthnInstant string       `xml:"AuthnInstant,attr"`
-		SessionIndex string       `xml:"SessionIndex,attr"`
-		AuthnContext AuthnContext `xml:"saml:AuthnContext"`
-	}
-	type AttributeStatement struct {
-		XMLName    xml.Name    `xml:"saml:AttributeStatement"`
-		Attributes []Attribute `xml:"saml:Attribute"`
-	}
-	type Issuer struct {
-		XMLName xml.Name `xml:"saml:Issuer"`
-		Value   string   `xml:",chardata"`
-	}
-	type Assertion struct {
-		XMLName            xml.Name           `xml:"saml:Assertion"`
-		ID                 string             `xml:"ID,attr"`
-		Version            string             `xml:"Version,attr"`
-		IssueInstant       string             `xml:"IssueInstant,attr"`
-		Issuer             Issuer             `xml:"saml:Issuer"`
-		Subject            Subject            `xml:"saml:Subject"`
-		Conditions         Conditions         `xml:"saml:Conditions"`
-		AuthnStatement     AuthnStatement     `xml:"saml:AuthnStatement"`
-		AttributeStatement AttributeStatement `xml:"saml:AttributeStatement"`
-		// NOTE: Signature element would be inserted here when signing is implemented.
-	}
-	type Response struct {
-		XMLName      xml.Name  `xml:"samlp:Response"`
-		XmlnsSAMLp   string    `xml:"xmlns:samlp,attr"`
-		XmlnsSAML    string    `xml:"xmlns:saml,attr"`
-		XmlnsXSI     string    `xml:"xmlns:xsi,attr"`
-		ID           string    `xml:"ID,attr"`
-		Version      string    `xml:"Version,attr"`
-		IssueInstant string    `xml:"IssueInstant,attr"`
-		Destination  string    `xml:"Destination,attr"`
-		InResponseTo string    `xml:"InResponseTo,attr"`
-		Issuer       Issuer    `xml:"saml:Issuer"`
-		Status       Status    `xml:"samlp:Status"`
-		Assertion    Assertion `xml:"saml:Assertion"`
-	}
-
-	attributes := []Attribute{
+	attributes := []models.Attribute{
 		{
 			Name:          "email",
 			NameFormat:    "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
-			AttributeVals: []AttributeValue{{Value: userSession.Email}},
+			AttributeVals: []models.AttributeValue{{Value: userSession.Email}},
 		},
 		{
 			Name:          "username",
 			NameFormat:    "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
-			AttributeVals: []AttributeValue{{Value: userSession.Username}},
+			AttributeVals: []models.AttributeValue{{Value: userSession.Username}},
 		},
 		{
 			Name:          "status",
 			NameFormat:    "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
-			AttributeVals: []AttributeValue{{Value: userSession.Status}},
+			AttributeVals: []models.AttributeValue{{Value: userSession.Status}},
 		},
 	}
 	if len(roleValues) > 0 {
-		var roleAttrVals []AttributeValue
+		var roleAttrVals []models.AttributeValue
 		for _, rv := range roleValues {
-			roleAttrVals = append(roleAttrVals, AttributeValue{Value: rv})
+			roleAttrVals = append(roleAttrVals, models.AttributeValue{Value: rv})
 		}
-		attributes = append(attributes, Attribute{
+		attributes = append(attributes, models.Attribute{
 			Name:          "role",
 			NameFormat:    "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
 			AttributeVals: roleAttrVals,
 		})
 	}
 
-	assertion := Assertion{
+	assertion := models.Assertion{
 		ID:           assertionID,
 		Version:      "2.0",
 		IssueInstant: formatTime(now),
-		Issuer:       Issuer{Value: idpEntityID},
-		Subject: Subject{
-			NameID: NameID{Format: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress", Value: userSession.Email},
-			SubjectConfirmations: []SubjectConfirmation{{
+		Issuer:       models.Issuer{Value: idpEntityID},
+		Subject: models.Subject{
+			NameID: models.NameID{
+				Format: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+				Value:  userSession.Email,
+			},
+			SubjectConfirmations: []models.SubjectConfirmation{{
 				Method: "urn:oasis:names:tc:SAML:2.0:cm:bearer",
-				SubjectConfirmationData: SubjectConfirmationData{
+				SubjectConfirmationData: models.SubjectConfirmationData{
 					InResponseTo: samlContext.RequestID,
 					NotOnOrAfter: formatTime(notOnOrAfter),
 					Recipient:    samlContext.AssertionConsumerServiceURL,
 				},
 			}},
 		},
-		Conditions: Conditions{
+		Conditions: models.Conditions{
 			NotBefore:           formatTime(notBefore),
 			NotOnOrAfter:        formatTime(notOnOrAfter),
-			AudienceRestriction: AudienceRestriction{Audience: Audience{Value: samlContext.Issuer}},
+			AudienceRestriction: models.AudienceRestriction{Audience: models.Audience{Value: samlContext.Issuer}},
 		},
-		AuthnStatement: AuthnStatement{
+		AuthnStatement: models.AuthnStatement{
 			AuthnInstant: formatTime(authnInstant),
 			SessionIndex: userSession.SessionID,
-			AuthnContext: AuthnContext{
-				AuthnContextClassRef: AuthnContextClassRef{
+			AuthnContext: models.AuthnContext{
+				AuthnContextClassRef: models.AuthnContextClassRef{
 					Value: "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport",
 				},
 			},
 		},
-		AttributeStatement: AttributeStatement{Attributes: attributes},
+		AttributeStatement: models.AttributeStatement{Attributes: attributes},
 	}
 
-	resp := Response{
+	resp := models.Response{
 		XmlnsSAMLp:   "urn:oasis:names:tc:SAML:2.0:protocol",
 		XmlnsSAML:    "urn:oasis:names:tc:SAML:2.0:assertion",
 		XmlnsXSI:     "http://www.w3.org/2001/XMLSchema-instance",
@@ -419,12 +307,11 @@ func (s *UserService) BuildSAMLResponse(
 		IssueInstant: formatTime(now),
 		Destination:  samlContext.AssertionConsumerServiceURL,
 		InResponseTo: samlContext.RequestID,
-		Issuer:       Issuer{Value: idpEntityID},
-		Status:       Status{StatusCode: StatusCode{Value: "urn:oasis:names:tc:SAML:2.0:status:Success"}},
+		Issuer:       models.Issuer{Value: idpEntityID},
+		Status:       models.Status{StatusCode: models.StatusCode{Value: "urn:oasis:names:tc:SAML:2.0:status:Success"}},
 		Assertion:    assertion,
 	}
 
-	// Marshal XML
 	raw, err := xml.MarshalIndent(resp, "", "  ")
 	if err != nil {
 		return "", err

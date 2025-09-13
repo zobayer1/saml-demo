@@ -35,7 +35,7 @@
     <div class="alert alert-error"><strong>No session data.</strong> Re-authenticate to view attributes.</div>
     {{end}}
 </div>
-<!-- Anti-BFCache: force reload if restored from BFCache so cache-control headers re-evaluate session -->
+
 <script>(function(){
   function handle(e){ if(e.persisted){ window.location.reload(); } }
   window.addEventListener('pageshow', handle);

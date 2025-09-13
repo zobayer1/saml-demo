@@ -1,4 +1,5 @@
 {{define "content"}}
+<!--suppress HtmlUnknownTarget -->
 <div class="auth-card login-card">
   <div class="auth-header">
     <h2>{{.Title}}</h2>
@@ -15,7 +16,7 @@
     <a href="/" class="auth-link login-back">Return to public landing page</a>
   </div>
 </div>
-<!-- Anti-back: if login page restored from bfcache after successful auth, force network reload so server redirects to /home -->
+
 <script>(function(){
   function onShow(e){ if(e.persisted){ window.location.reload(); } }
   window.addEventListener('pageshow', onShow);

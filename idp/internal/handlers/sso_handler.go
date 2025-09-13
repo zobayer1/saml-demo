@@ -97,20 +97,17 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("  Issuer: %s", authnRequest.Issuer.Value)
 	log.Debugf("RelayState: %s", relayState)
 
-	// Store SAML request context in session using the proper struct
 	samlSession, err := session.Store.Get(r, "saml-context")
 	if err != nil {
 		log.WithError(err).Error("Failed to get SAML context session")
 	}
 
-	// Parse IssueInstant string to time.Time
 	issueInstant, err := time.Parse(time.RFC3339, authnRequest.IssueInstant)
 	if err != nil {
 		log.WithError(err).Warn("Failed to parse IssueInstant, using current time")
 		issueInstant = time.Now()
 	}
 
-	// Create SAMLRequestContext struct with all the data
 	samlContext := models.SAMLRequestContext{
 		RequestID:                   authnRequest.ID,
 		Issuer:                      authnRequest.Issuer.Value,
@@ -122,7 +119,6 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 		RequestTimestamp:            time.Now(),
 	}
 
-	// Store the entire struct in session using explicit serialization
 	serializedContext, err := samlContext.Serialize()
 	if err != nil {
 		log.WithError(err).Error("Failed to serialize SAML context")
@@ -140,7 +136,6 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 
 	log.Debugf("SAML request context serialized and stored in session: %+v", samlContext)
 
-	// Retrieve and deserialize user session to determine authentication status
 	userSessionCookie, err := session.Store.Get(r, "user-session")
 	if err != nil {
 		log.WithError(err).Error("Session store corruption detected during login validation")
@@ -159,7 +154,6 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 				"req_id":     authnRequest.ID,
 			}).Info("User already authenticated - generating SAML response")
 
-			// Build response immediately
 			samlResp, respErr := h.userService.BuildSAMLResponse(*userSess, samlContext)
 			if respErr != nil {
 				log.WithError(respErr).Error("Failed to build SAML response for existing session")
@@ -167,10 +161,8 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Persist a sanitized copy as last-saml for future back-button reissue (TTL via timestamp inside context)
 			samlSession.Values["last-saml"] = samlSession.Values["saml-context"]
 
-			// One-time context use - clear session context
 			delete(samlSession.Values, "saml-context")
 			if err := samlSession.Save(r, w); err != nil {
 				log.WithError(err).Warn("Failed to clear saml-context after response generation")
@@ -190,10 +182,8 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 		log.Debug("User session key missing or empty - unauthenticated")
 	}
 
-	// User not authenticated - redirect to login page
 	log.WithField("sp", authnRequest.Issuer.Value).Info("User not authenticated - redirecting to login for SAML flow")
 
-	// Generate login URL with context marker
 	loginURL := "/login?saml=true"
 	log.Debugf("Redirecting to login: %s", loginURL)
 
@@ -226,7 +216,6 @@ func (h *SsoHandler) HandleSlo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Decode and inflate LogoutRequest
 	decodedRequest, err := base64.StdEncoding.DecodeString(samlRequest)
 	if err != nil {
 		log.WithError(err).Error("Failed to decode SAMLRequest in SLO")
@@ -235,14 +224,17 @@ func (h *SsoHandler) HandleSlo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reader := flate.NewReader(bytes.NewReader(decodedRequest))
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Error("Error closing flate reader: stream was not deflated")
+		}
+	}()
 	xmlData, err := io.ReadAll(reader)
 	if err != nil {
 		log.Warn("SLO inflation failed, treating as uncompressed")
 		xmlData = decodedRequest
 	}
 
-	// Parse LogoutRequest
 	var logoutReq struct {
 		XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:protocol LogoutRequest"`
 		ID      string   `xml:",attr"`
@@ -269,41 +261,38 @@ func (h *SsoHandler) HandleSlo(w http.ResponseWriter, r *http.Request) {
 		"session": logoutReq.SessionIndex.Value,
 	}).Info("Processing SLO request")
 
-	// Clear IdP session (demo: just invalidate user session)
 	userSession, err := session.Store.Get(r, "user-session")
 	if err == nil {
 		delete(userSession.Values, "user-session")
 		_ = userSession.Save(r, w)
 	}
 
-	// Build LogoutResponse
 	responseID := fmt.Sprintf("_slo_resp_%x", time.Now().UnixNano())
 	logoutResp := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-    ID="%s" Version="2.0" IssueInstant="%s" InResponseTo="%s">
-  <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">urn:samldemo:idp</saml:Issuer>
-  <samlp:Status>
-    <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
-  </samlp:Status>
-</samlp:LogoutResponse>`,
+		<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+			ID="%s" Version="2.0" IssueInstant="%s" InResponseTo="%s">
+		  <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">urn:samldemo:idp</saml:Issuer>
+		  <samlp:Status>
+			<samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+		  </samlp:Status>
+		</samlp:LogoutResponse>`,
 		responseID, time.Now().UTC().Format(time.RFC3339), logoutReq.ID)
 
 	encoded := base64.StdEncoding.EncodeToString([]byte(logoutResp))
 
-	// Redirect back to SP
 	if relayState == "" {
 		relayState = "https://" + strings.TrimPrefix(logoutReq.Issuer.Value, "urn:samldemo:") + ".localhost:800" +
 			map[string]string{"sp1": "1", "sp2": "2"}[strings.TrimPrefix(logoutReq.Issuer.Value, "urn:samldemo:")] + "/"
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(
+	_, _ = fmt.Fprintf(
 		w,
 		`<!DOCTYPE html><html><head><title>SAML SLO Response</title></head><body onload="document.forms[0].submit()">`,
 	)
-	fmt.Fprintf(w, `<form method="post" action="%s">`, template.HTMLEscapeString(relayState))
-	fmt.Fprintf(w, `<input type="hidden" name="SAMLResponse" value="%s"/>`, template.HTMLEscapeString(encoded))
-	fmt.Fprintf(
+	_, _ = fmt.Fprintf(w, `<form method="post" action="%s">`, template.HTMLEscapeString(relayState))
+	_, _ = fmt.Fprintf(w, `<input type="hidden" name="SAMLResponse" value="%s"/>`, template.HTMLEscapeString(encoded))
+	_, _ = fmt.Fprintf(
 		w,
 		`<noscript><p>JavaScript disabled. Click continue.</p><button type="submit">Continue</button></noscript></form></body></html>`,
 	)
