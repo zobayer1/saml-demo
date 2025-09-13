@@ -466,6 +466,95 @@ func (h *HomeHandler) buildRedirectAuthnRequest(relayState string) (string, erro
 	return h.cfg.IDPSSOURL + "?" + values.Encode(), nil
 }
 
+// Minimal LogoutRequest model and helpers for SP2 SLO
+type logoutRequest struct {
+	XMLName      xml.Name      `xml:"urn:oasis:names:tc:SAML:2.0:protocol LogoutRequest"`
+	ID           string        `xml:",attr"`
+	Version      string        `xml:",attr"`
+	IssueInstant string        `xml:",attr"`
+	Destination  string        `xml:",attr"`
+	Issuer       issuer        `xml:"urn:oasis:names:tc:SAML:2.0:assertion Issuer"`
+	NameID       nameID        `xml:"urn:oasis:names:tc:SAML:2.0:assertion NameID"`
+	SessionIndex *sessionIndex `xml:"SessionIndex,omitempty"`
+}
+
+type nameID struct {
+	Value string `xml:",chardata"`
+}
+type sessionIndex struct {
+	Value string `xml:",chardata"`
+}
+
+// HandleLogout initiates SP2 SLO
+func (h *HomeHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
+	var nameIDVal string
+	if c, err := r.Cookie("sp2-auth"); err == nil {
+		raw := c.Value
+		if strings.HasPrefix(raw, "j:") {
+			if b, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(raw, "j:")); err == nil {
+				var payload struct {
+					Email string `json:"email"`
+				}
+				_ = json.Unmarshal(b, &payload)
+				nameIDVal = payload.Email
+			}
+		} else {
+			nameIDVal = raw
+		}
+	}
+	http.SetCookie(w, &http.Cookie{Name: "sp2-auth", Value: "", Path: "/", Expires: time.Unix(0, 0), MaxAge: -1})
+	if nameIDVal == "" {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	sloURL, err := h.buildLogoutRedirect(nameIDVal, "demo-session-index", h.cfg.SLOReturnURL)
+	if err != nil {
+		log.WithError(err).Error("Failed to build SP2 LogoutRequest redirect")
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	log.WithField("redirect", sloURL).Info("Initiating SP2 SLO")
+	http.Redirect(w, r, sloURL, http.StatusFound)
+}
+
+// HandleSLOComplete consumes optional LogoutResponse and returns to landing page
+func (h *HomeHandler) HandleSLOComplete(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (h *HomeHandler) buildLogoutRedirect(nameIDVal, sessIndex, relayReturn string) (string, error) {
+	id, err := randomID(16)
+	if err != nil {
+		return "", err
+	}
+	lr := logoutRequest{
+		ID:           id,
+		Version:      "2.0",
+		IssueInstant: time.Now().UTC().Format(time.RFC3339),
+		Destination:  h.cfg.IDPSLOURL,
+		Issuer:       issuer{Value: h.cfg.EntityID},
+		NameID:       nameID{Value: nameIDVal},
+		SessionIndex: &sessionIndex{Value: sessIndex},
+	}
+	xmlBytes, err := xml.Marshal(lr)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	zw, _ := flate.NewWriter(&buf, flate.DefaultCompression)
+	if _, err = zw.Write(xmlBytes); err != nil {
+		return "", err
+	}
+	_ = zw.Close()
+	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
+	q := url.Values{}
+	q.Set("SAMLRequest", encoded)
+	if relayReturn != "" {
+		q.Set("RelayState", relayReturn)
+	}
+	return h.cfg.IDPSLOURL + "?" + q.Encode(), nil
+}
+
 func randomID(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

@@ -34,6 +34,8 @@ func main() {
 	// Login selection (unauthenticated only)
 	mux.HandleFunc("/login", homeHandler.HandleLogin)
 	mux.HandleFunc("/login/start", homeHandler.HandleLoginStart)
+	mux.HandleFunc("/logout", homeHandler.HandleLogout)
+	mux.HandleFunc("/slo/complete", homeHandler.HandleSLOComplete)
 
 	mux.HandleFunc("/metadata", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")

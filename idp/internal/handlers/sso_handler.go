@@ -198,9 +198,110 @@ func (h *SsoHandler) HandleSso(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SsoHandler) HandleSlo(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodPost && r.Method != http.MethodGet {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	http.Error(w, "Not Implemented", http.StatusNotImplemented)
+
+	var samlRequest, relayState string
+	if r.Method == http.MethodGet {
+		samlRequest = r.URL.Query().Get("SAMLRequest")
+		relayState = r.URL.Query().Get("RelayState")
+	} else {
+		if err := r.ParseForm(); err != nil {
+			log.WithError(err).Error("Failed to parse SLO form data")
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		samlRequest = r.FormValue("SAMLRequest")
+		relayState = r.FormValue("RelayState")
+	}
+
+	if samlRequest == "" {
+		log.Error("Missing SAMLRequest parameter in SLO")
+		http.Error(w, "Missing SAMLRequest parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Decode and inflate LogoutRequest
+	decodedRequest, err := base64.StdEncoding.DecodeString(samlRequest)
+	if err != nil {
+		log.WithError(err).Error("Failed to decode SAMLRequest in SLO")
+		http.Error(w, "Malformed SAMLRequest", http.StatusBadRequest)
+		return
+	}
+
+	reader := flate.NewReader(bytes.NewReader(decodedRequest))
+	defer reader.Close()
+	xmlData, err := io.ReadAll(reader)
+	if err != nil {
+		log.Warn("SLO inflation failed, treating as uncompressed")
+		xmlData = decodedRequest
+	}
+
+	// Parse LogoutRequest
+	var logoutReq struct {
+		XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:protocol LogoutRequest"`
+		ID      string   `xml:",attr"`
+		Issuer  struct {
+			Value string `xml:",chardata"`
+		} `xml:"urn:oasis:names:tc:SAML:2.0:assertion Issuer"`
+		NameID struct {
+			Value string `xml:",chardata"`
+		} `xml:"urn:oasis:names:tc:SAML:2.0:assertion NameID"`
+		SessionIndex struct {
+			Value string `xml:",chardata"`
+		} `xml:"SessionIndex"`
+	}
+	if err := xml.Unmarshal(xmlData, &logoutReq); err != nil {
+		log.WithError(err).Error("Failed to parse LogoutRequest XML")
+		http.Error(w, "Invalid LogoutRequest", http.StatusBadRequest)
+		return
+	}
+
+	log.WithFields(log.Fields{
+		"req_id":  logoutReq.ID,
+		"issuer":  logoutReq.Issuer.Value,
+		"nameID":  logoutReq.NameID.Value,
+		"session": logoutReq.SessionIndex.Value,
+	}).Info("Processing SLO request")
+
+	// Clear IdP session (demo: just invalidate user session)
+	userSession, err := session.Store.Get(r, "user-session")
+	if err == nil {
+		delete(userSession.Values, "user-session")
+		_ = userSession.Save(r, w)
+	}
+
+	// Build LogoutResponse
+	responseID := fmt.Sprintf("_slo_resp_%x", time.Now().UnixNano())
+	logoutResp := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+    ID="%s" Version="2.0" IssueInstant="%s" InResponseTo="%s">
+  <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">urn:samldemo:idp</saml:Issuer>
+  <samlp:Status>
+    <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+  </samlp:Status>
+</samlp:LogoutResponse>`,
+		responseID, time.Now().UTC().Format(time.RFC3339), logoutReq.ID)
+
+	encoded := base64.StdEncoding.EncodeToString([]byte(logoutResp))
+
+	// Redirect back to SP
+	if relayState == "" {
+		relayState = "https://" + strings.TrimPrefix(logoutReq.Issuer.Value, "urn:samldemo:") + ".localhost:800" +
+			map[string]string{"sp1": "1", "sp2": "2"}[strings.TrimPrefix(logoutReq.Issuer.Value, "urn:samldemo:")] + "/"
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(
+		w,
+		`<!DOCTYPE html><html><head><title>SAML SLO Response</title></head><body onload="document.forms[0].submit()">`,
+	)
+	fmt.Fprintf(w, `<form method="post" action="%s">`, template.HTMLEscapeString(relayState))
+	fmt.Fprintf(w, `<input type="hidden" name="SAMLResponse" value="%s"/>`, template.HTMLEscapeString(encoded))
+	fmt.Fprintf(
+		w,
+		`<noscript><p>JavaScript disabled. Click continue.</p><button type="submit">Continue</button></noscript></form></body></html>`,
+	)
 }
